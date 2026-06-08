@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-EXCEL_PATH = os.environ.get("EXCEL_PATH", "data/06_07_26_Evergreen_Database_v8.xlsx")
+EXCEL_PATH = os.environ.get("EXCEL_PATH", "data/06_08_26_Evergreen_Database_v10.xlsx")
 PERF_SHEET = "fund_performance"
 META_SHEET = "fund_metadata"
 PB_SHEET = "pitchbook_tri_index"
