@@ -4,274 +4,106 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SGG Evergreen Monitor</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      min-height: 100vh;
+      background: #0f1117; color: #e2e8f0; min-height: 100vh;
     }
-
-    /* ── header ── */
     header {
-      background: #1a1d27;
-      border-bottom: 1px solid #2d3148;
-      padding: 18px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      background: #1a1d27; border-bottom: 1px solid #2d3148;
+      padding: 18px 32px; display: flex; align-items: center; justify-content: space-between;
     }
     header h1 { font-size: 18px; font-weight: 600; letter-spacing: .3px; color: #fff; }
     header span { font-size: 12px; color: #6b7280; }
-
-    /* ── layout ── */
-    main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
-
-    section { margin-bottom: 40px; }
-    section h2 {
-      font-size: 13px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      color: #6b7280;
-      margin-bottom: 14px;
+    main { max-width: 1000px; margin: 0 auto; padding: 32px 24px; }
+    h2 {
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .8px; color: #6b7280; margin-bottom: 14px;
     }
-
-    /* ── table ── */
     .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #2d3148; }
     table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
     thead { background: #1a1d27; }
     thead th {
-      padding: 11px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: #9ca3af;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      white-space: nowrap;
+      padding: 11px 16px; text-align: left; font-weight: 600; color: #9ca3af;
+      font-size: 12px; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
     }
-    tbody tr { border-top: 1px solid #1e2133; transition: background .15s; }
+    tbody tr { border-top: 1px solid #1e2133; }
     tbody tr:hover { background: #1a1d27; }
     tbody td { padding: 11px 16px; white-space: nowrap; }
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .4px;
-    }
-    .badge.private_equity  { background: #1e3a5f; color: #60a5fa; }
-    .badge.private_credit  { background: #1a3a2a; color: #34d399; }
-    .badge.secondaries     { background: #3b2a4a; color: #c084fc; }
-    .badge.venture         { background: #3b2a1a; color: #fb923c; }
-
+    th.num, td.num { text-align: right; }
     .nav-val { font-weight: 600; color: #f1f5f9; font-variant-numeric: tabular-nums; }
-    .sgg-nav { color: #94a3b8; font-variant-numeric: tabular-nums; }
-    .date    { color: #6b7280; font-size: 12px; }
-
-    /* ── chart card ── */
-    .chart-card {
-      background: #1a1d27;
-      border: 1px solid #2d3148;
-      border-radius: 10px;
-      padding: 24px;
-    }
-    .chart-controls {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-    select {
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      color: #e2e8f0;
-      padding: 7px 12px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    select:focus { outline: none; border-color: #4f6ef7; }
-
-    canvas { width: 100% !important; }
-
-    /* ── loading / error ── */
-    .loading { color: #4b5563; font-size: 13px; padding: 20px 0; }
-    .error   { color: #f87171; font-size: 13px; padding: 20px 0; }
+    .date { color: #6b7280; font-size: 12px; }
+    .strategy { color: #94a3b8; }
+    .state { padding: 24px 16px; font-size: 13px; }
+    .loading { color: #6b7280; }
+    .error { color: #f87171; }
   </style>
 </head>
 <body>
 
 <header>
   <h1>SGG · Evergreen Monitor</h1>
-  <span id="last-updated">Loading…</span>
+  <span id="status">Loading…</span>
 </header>
 
 <main>
-
-  <!-- ── Summary Table ── -->
-  <section>
-    <h2>Current Holdings — Latest NAV</h2>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Fund</th>
-            <th>Strategy</th>
-            <th>As of</th>
-            <th>NAV / Share</th>
-            <th>SGG NAV ($)</th>
-          </tr>
-        </thead>
-        <tbody id="nav-table-body">
-          <tr><td class="loading" colspan="5">Loading…</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── NAV History Chart ── -->
-  <section>
-    <h2>NAV / Share — Historical</h2>
-    <div class="chart-card">
-      <div class="chart-controls">
-        <label for="fund-select" style="font-size:13px;color:#9ca3af;">Fund:</label>
-        <select id="fund-select"><option>Loading…</option></select>
-      </div>
-      <canvas id="nav-chart" height="320"></canvas>
-    </div>
-  </section>
-
+  <h2>Latest NAV per Fund</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fund Name</th>
+          <th>Strategy</th>
+          <th>As Of</th>
+          <th class="num">NAV / Share</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td class="state loading" colspan="4">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </main>
 
 <script>
-  // ── strategy badge colour helper ──────────────────────────────────────────
-  function badge(strategy) {
-    const s = (strategy || "").replace(/\s+/g, "_").toLowerCase();
-    return `<span class="badge ${s}">${(strategy || "—").replace("_", " ")}</span>`;
+  function fmtStrategy(s) {
+    return s ? s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "—";
   }
 
-  function fmt(n) {
-    if (n == null) return "—";
-    return "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-
-  // ── load summary table ────────────────────────────────────────────────────
-  async function loadTable() {
-    const tbody = document.getElementById("nav-table-body");
+  async function load() {
+    const tbody = document.getElementById("tbody");
+    const status = document.getElementById("status");
     try {
-      const res  = await fetch("/api/nav");
+      const res = await fetch("/api/nav");
+      if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
+      const navs = data.navs || [];
 
-      if (!data.length) {
-        tbody.innerHTML = `<tr><td class="error" colspan="5">No data returned.</td></tr>`;
+      if (!navs.length) {
+        tbody.innerHTML = `<tr><td class="state error" colspan="4">No data returned.</td></tr>`;
+        status.textContent = "No data";
         return;
       }
 
-      // show latest date in header
-      const dates = data.map(d => d.month_end).filter(Boolean).sort();
-      document.getElementById("last-updated").textContent =
-        "Data as of " + (dates[dates.length - 1] ?? "—");
-
-      tbody.innerHTML = data.map(r => `
+      tbody.innerHTML = navs.map(r => `
         <tr>
           <td><strong>${r.fund_name ?? "—"}</strong></td>
-          <td>${badge(r.strategy)}</td>
-          <td class="date">${r.month_end ?? "—"}</td>
-          <td class="nav-val">${r.nav_per_share != null ? "$" + Number(r.nav_per_share).toFixed(2) : "—"}</td>
-          <td class="sgg-nav">${r.sgg_nav != null ? fmt(r.sgg_nav) : "—"}</td>
+          <td class="strategy">${fmtStrategy(r.strategy)}</td>
+          <td class="date">${r.as_of ?? "—"}</td>
+          <td class="num nav-val">${r.nav_per_share != null ? "$" + Number(r.nav_per_share).toFixed(2) : "—"}</td>
         </tr>
       `).join("");
+
+      const latest = navs.map(r => r.as_of).filter(Boolean).sort().pop();
+      status.textContent = `${navs.length} funds · latest ${latest ?? "—"}`;
     } catch (e) {
-      tbody.innerHTML = `<tr><td class="error" colspan="5">Error: ${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td class="state error" colspan="4">Error loading data: ${e.message}</td></tr>`;
+      status.textContent = "Error";
     }
   }
 
-  // ── chart state ───────────────────────────────────────────────────────────
-  let chart = null;
-
-  async function loadChart(fundId) {
-    const res  = await fetch(`/api/nav_history/${fundId}`);
-    const data = await res.json();
-
-    const labels = data.map(d => d.month_end);
-    const values = data.map(d => d.nav_per_share);
-    const name   = data[0]?.fund_name ?? "Fund";
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(document.getElementById("nav-chart"), {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: name + " — NAV/Share",
-          data: values,
-          borderColor: "#4f6ef7",
-          backgroundColor: "rgba(79,110,247,0.08)",
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          fill: true,
-          tension: 0.3,
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { labels: { color: "#9ca3af", font: { size: 12 } } },
-          tooltip: {
-            callbacks: {
-              label: ctx => " $" + ctx.parsed.y.toFixed(2)
-            }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: "#6b7280", maxTicksLimit: 12, font: { size: 11 } },
-            grid:  { color: "#1e2133" }
-          },
-          y: {
-            ticks: {
-              color: "#6b7280",
-              font: { size: 11 },
-              callback: v => "$" + v.toFixed(2)
-            },
-            grid: { color: "#1e2133" }
-          }
-        }
-      }
-    });
-  }
-
-  // ── populate fund dropdown ────────────────────────────────────────────────
-  async function loadFunds() {
-    const sel = document.getElementById("fund-select");
-    try {
-      const res   = await fetch("/api/funds");
-      const funds = await res.json();
-
-      sel.innerHTML = funds.map(f =>
-        `<option value="${f.fund_id}">${f.fund_name}</option>`
-      ).join("");
-
-      sel.addEventListener("change", () => loadChart(sel.value));
-      loadChart(sel.value);           // load first fund immediately
-    } catch (e) {
-      sel.innerHTML = `<option>Error loading funds</option>`;
-    }
-  }
-
-  // ── init ─────────────────────────────────────────────────────────────────
-  loadTable();
-  loadFunds();
+  load();
 </script>
 
 </body>
