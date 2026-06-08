@@ -7,162 +7,178 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
-    --bg:#0a0f1e; --card:#1a2035; --accent:#4f6ef7; --line:#27304d;
-    --text:#f1f5f9; --muted:#8b94ad; --green:#34d399; --red:#f87171;
+    --page-bg:#f0f2f5; --sidebar:#1e2d3d; --sidebar-text:#a0b4c8; --sidebar-active-bg:#243547;
+    --teal:#00a8a8; --card:#ffffff; --card-border:#d0d7de; --text:#1a1a2e; --muted:#666;
+    --accent:#1a5276; --green:#1a7a4a; --red:#c0392b;
+    --th-bg:#f5f7fa; --th-text:#444; --row-alt:#fafbfc; --tbl-border:#e8ecef;
   }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+  *{box-sizing:border-box;margin:0;padding:0;border-radius:0;}
+  body{font-family:-apple-system,"Segoe UI",Arial,sans-serif;background:var(--page-bg);
+    color:var(--text);min-height:100vh;font-size:13px;}
 
-  /* nav */
-  nav{background:var(--card);border-bottom:1px solid var(--line);
-    padding:0 28px;display:flex;align-items:center;gap:4px;position:sticky;top:0;z-index:20;}
-  nav .brand{font-weight:700;letter-spacing:.4px;margin-right:24px;padding:16px 0;color:#fff;}
-  nav .brand small{color:var(--accent);}
-  nav button{background:none;border:none;color:var(--muted);padding:18px 16px;
-    font-size:13.5px;cursor:pointer;border-bottom:2px solid transparent;font-weight:500;}
-  nav button:hover{color:var(--text);}
-  nav button.active{color:#fff;border-bottom-color:var(--accent);}
+  /* layout */
+  .layout{display:flex;min-height:100vh;}
+  .sidebar{position:fixed;top:0;left:0;width:200px;height:100vh;background:var(--sidebar);
+    display:flex;flex-direction:column;z-index:30;}
+  .sidebar .brand{padding:18px 20px;border-bottom:1px solid #2a3b4d;}
+  .sidebar .brand .b1{color:#fff;font-size:14px;font-weight:700;letter-spacing:.5px;}
+  .sidebar .brand .b2{color:var(--sidebar-text);font-size:11px;margin-top:3px;}
+  .sidebar button{display:block;width:100%;text-align:left;background:none;border:none;
+    border-left:3px solid transparent;color:var(--sidebar-text);height:40px;padding:0 0 0 20px;
+    font-size:13px;cursor:pointer;font-family:inherit;}
+  .sidebar button:hover{background:var(--sidebar-active-bg);}
+  .sidebar button.active{background:var(--sidebar-active-bg);color:#fff;border-left-color:var(--teal);}
 
-  main{max-width:1280px;margin:0 auto;padding:28px 24px 60px;}
+  .content{margin-left:200px;flex:1;min-width:0;}
+  .topbar{background:#fff;border-bottom:1px solid var(--card-border);padding:14px 24px;
+    display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;}
+  .topbar .ptitle{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text);}
+  .topbar .asof{font-size:12px;color:var(--muted);}
+  main{padding:22px 24px 50px;}
+
   .page{display:none;}
   .page.active{display:block;}
+  .subtitle{color:var(--muted);font-size:12px;margin-bottom:18px;}
+  h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+    color:var(--th-text);margin-bottom:12px;}
 
-  h1{font-size:24px;font-weight:700;margin-bottom:4px;}
-  .subtitle{color:var(--muted);font-size:13px;margin-bottom:24px;}
-  h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
-    color:var(--muted);margin-bottom:14px;}
-
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;}
-  .grid{display:grid;gap:18px;}
+  .card{background:var(--card);border:1px solid var(--card-border);padding:16px;}
+  .grid{display:grid;gap:16px;}
 
   /* KPI */
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;}
-  .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px;}
-  .kpi .value{font-size:28px;font-weight:700;margin-top:8px;font-variant-numeric:tabular-nums;}
-  .kpi .value.sm{font-size:20px;}
+  .kpi{background:var(--card);border:1px solid var(--card-border);border-left:3px solid var(--accent);padding:16px 18px;}
+  .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+  .kpi .value{font-size:24px;font-weight:700;margin-top:8px;color:var(--text);font-variant-numeric:tabular-nums;}
+  .kpi .value.sm{font-size:18px;}
 
-  /* home layout */
-  .home-grid{grid-template-columns:260px 1fr;align-items:start;}
+  .home-grid{grid-template-columns:240px 1fr;align-items:start;}
   .home-kpis{display:flex;flex-direction:column;gap:16px;}
 
   .chart-wrap{position:relative;width:100%;}
   canvas{width:100%!important;}
 
   /* tables */
-  table{width:100%;border-collapse:collapse;font-size:13px;}
-  thead th{text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;
-    letter-spacing:.5px;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;}
-  tbody td{padding:10px 12px;border-bottom:1px solid #141a2e;white-space:nowrap;}
-  tbody tr:hover{background:#202a45;}
+  table{width:100%;border-collapse:collapse;font-size:13px;border:1px solid var(--card-border);}
+  thead th{text-align:left;background:var(--th-bg);color:var(--th-text);font-size:11px;font-weight:400;
+    text-transform:uppercase;letter-spacing:.4px;padding:9px 14px;border-bottom:1px solid var(--tbl-border);white-space:nowrap;}
+  tbody td{padding:9px 14px;border-bottom:1px solid var(--tbl-border);white-space:nowrap;}
+  tbody tr:nth-child(even){background:var(--row-alt);}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.num{font-size:15px;font-weight:600;}
   .pos{color:var(--green);} .neg{color:var(--red);} .mut{color:var(--muted);}
-  strong{font-weight:600;}
+  strong{font-weight:700;}
 
-  select{background:var(--bg);border:1px solid var(--line);color:var(--text);
-    padding:9px 14px;border-radius:8px;font-size:14px;cursor:pointer;min-width:260px;}
+  select{background:#fff;border:1px solid var(--card-border);color:var(--text);
+    padding:8px 12px;font-size:13px;cursor:pointer;min-width:260px;font-family:inherit;}
   select:focus{outline:none;border-color:var(--accent);}
 
-  .state{padding:30px 0;color:var(--muted);font-size:13px;text-align:center;}
+  .state{padding:24px 0;color:var(--muted);font-size:13px;text-align:center;}
   .err{color:var(--red);}
-  .note{background:#221c12;border:1px solid #4a3a1a;color:#f0c674;font-size:12px;
-    padding:8px 14px;border-radius:8px;margin-bottom:18px;}
+  .note{background:#fff8e6;border:1px solid #e0c878;color:#8a6d1a;font-size:12px;padding:8px 14px;margin-bottom:16px;}
   .row-2{grid-template-columns:1fr 1fr;}
-  @media(max-width:900px){.home-grid,.row-2{grid-template-columns:1fr;}}
+  @media(max-width:1000px){.home-grid,.row-2{grid-template-columns:1fr;}}
+  @media(max-width:760px){.sidebar{position:static;width:100%;height:auto;}.content{margin-left:0;}}
 </style>
 </head>
 <body>
 
-<nav>
-  <div class="brand">SGG <small>·</small> Evergreen Monitor</div>
-  <button data-page="home" class="active">Home</button>
-  <button data-page="portfolio">SGG Portfolio</button>
-  <button data-page="risk">Risk &amp; Return</button>
-  <button data-page="fund">Fund Details</button>
-</nav>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="brand"><div class="b1">SGG</div><div class="b2">Evergreen Monitor</div></div>
+    <button data-page="home" class="active">Home</button>
+    <button data-page="portfolio">SGG Portfolio</button>
+    <button data-page="risk">Risk &amp; Return</button>
+    <button data-page="fund">Fund Details</button>
+  </nav>
 
-<main>
-  <!-- PAGE 1: HOME -->
-  <section class="page active" id="page-home">
-    <h1>SGG Evergreen Monitor</h1>
-    <div class="subtitle" id="today"></div>
-    <div id="bench-note"></div>
-    <div class="grid home-grid">
-      <div class="home-kpis">
-        <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
-        <div class="kpi"><div class="label">Last Month Portfolio Return</div><div class="value" id="kpi-return">—</div></div>
-        <div class="kpi"><div class="label">Current Total SGG NAV</div><div class="value" id="kpi-nav">—</div></div>
-      </div>
-      <div class="card">
-        <h2>Total Return Index — All Funds (base 100 at inception)</h2>
-        <div class="chart-wrap"><canvas id="chart-home-tri" height="360"></canvas></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PAGE 2: PORTFOLIO -->
-  <section class="page" id="page-portfolio">
-    <h1>SGG Portfolio</h1>
-    <div class="subtitle">NAV-weighted view of SGG's evergreen holdings</div>
-    <div class="grid row-2" style="margin-bottom:18px;">
-      <div class="card"><h2>Current SGG NAV Allocation</h2><div class="chart-wrap"><canvas id="chart-pie" height="300"></canvas></div></div>
-      <div class="card"><h2>Portfolio TRI</h2><div class="chart-wrap"><canvas id="chart-ptri" height="300"></canvas></div></div>
-    </div>
-    <div class="grid row-2" style="margin-bottom:18px;">
-      <div class="card"><h2>Total SGG NAV Over Time ($)</h2><div class="chart-wrap"><canvas id="chart-totnav" height="300"></canvas></div></div>
-      <div class="card"><h2>Portfolio Monthly Return</h2><div class="chart-wrap"><canvas id="chart-pmret" height="300"></canvas></div></div>
-    </div>
-    <div class="card"><h2>Last Monthly Return by Fund</h2><div class="chart-wrap"><canvas id="chart-lastret" height="340"></canvas></div></div>
-  </section>
-
-  <!-- PAGE 3: RISK & RETURN -->
-  <section class="page" id="page-risk">
-    <h1>Risk &amp; Return</h1>
-    <div class="subtitle">Per-fund risk and return metrics, computed since each fund's inception</div>
-    <div class="grid row-2">
-      <div class="card">
-        <h2>Risk Metrics</h2>
-        <div style="overflow-x:auto;">
-        <table id="tbl-risk"><thead><tr>
-          <th>Fund</th><th class="num">Max DD</th><th class="num">Time to Trough</th>
-          <th class="num">Recovery</th><th class="num">Ann. Std Dev</th><th class="num">Downside Capture</th>
-        </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
+  <div class="content">
+    <header class="topbar">
+      <div class="ptitle" id="page-title">Home</div>
+      <div class="asof" id="asof">Data as of —</div>
+    </header>
+    <main>
+      <!-- PAGE 1: HOME -->
+      <section class="page active" id="page-home">
+        <div class="subtitle">Total return index across all evergreen holdings, base 100 at each fund's inception.</div>
+        <div id="bench-note"></div>
+        <div class="grid home-grid">
+          <div class="home-kpis">
+            <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
+            <div class="kpi"><div class="label">Last Month Portfolio Return</div><div class="value" id="kpi-return">—</div></div>
+            <div class="kpi"><div class="label">Current Total SGG NAV</div><div class="value" id="kpi-nav">—</div></div>
+          </div>
+          <div class="card">
+            <h2>Total Return Index — All Funds (base 100 at inception)</h2>
+            <div class="chart-wrap"><canvas id="chart-home-tri" height="360"></canvas></div>
+          </div>
         </div>
-      </div>
-      <div class="card">
-        <h2>Return Metrics</h2>
-        <div style="overflow-x:auto;">
-        <table id="tbl-ret"><thead><tr>
-          <th>Fund</th><th class="num">YTD</th><th class="num">1Y</th>
-          <th class="num">3Y</th><th class="num">Ann. Incep.</th><th class="num">Total Incep.</th>
-        </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
-        </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- PAGE 4: FUND DETAILS -->
-  <section class="page" id="page-fund">
-    <h1>Fund Details</h1>
-    <div class="subtitle">Single-fund total return index vs. benchmark</div>
-    <div style="margin-bottom:20px;"><select id="fund-select"><option>Loading…</option></select></div>
-    <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px;" id="fund-kpis">
-      <div class="kpi"><div class="label">Latest NAV / Share</div><div class="value sm" id="fk-nav">—</div></div>
-      <div class="kpi"><div class="label">Annualized Since Inception</div><div class="value sm" id="fk-cagr">—</div></div>
-      <div class="kpi"><div class="label">Strategy</div><div class="value sm" id="fk-strat">—</div></div>
-      <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
-    </div>
-    <div class="card"><h2 id="fk-title">Total Return Index</h2><div class="chart-wrap"><canvas id="chart-fund" height="380"></canvas></div></div>
-  </section>
-</main>
+      <!-- PAGE 2: PORTFOLIO -->
+      <section class="page" id="page-portfolio">
+        <div class="subtitle">NAV-weighted view of SGG's evergreen holdings</div>
+        <div class="grid row-2" style="margin-bottom:16px;">
+          <div class="card"><h2>Current SGG NAV Allocation</h2><div class="chart-wrap"><canvas id="chart-pie" height="300"></canvas></div></div>
+          <div class="card"><h2>Portfolio TRI</h2><div class="chart-wrap"><canvas id="chart-ptri" height="300"></canvas></div></div>
+        </div>
+        <div class="grid row-2" style="margin-bottom:16px;">
+          <div class="card"><h2>Total SGG NAV Over Time ($)</h2><div class="chart-wrap"><canvas id="chart-totnav" height="300"></canvas></div></div>
+          <div class="card"><h2>Portfolio Monthly Return</h2><div class="chart-wrap"><canvas id="chart-pmret" height="300"></canvas></div></div>
+        </div>
+        <div class="card"><h2>Last Monthly Return by Fund</h2><div class="chart-wrap"><canvas id="chart-lastret" height="340"></canvas></div></div>
+      </section>
+
+      <!-- PAGE 3: RISK & RETURN -->
+      <section class="page" id="page-risk">
+        <div class="subtitle">Per-fund risk and return metrics, computed since each fund's inception</div>
+        <div class="grid row-2">
+          <div class="card">
+            <h2>Risk Metrics</h2>
+            <div style="overflow-x:auto;">
+            <table id="tbl-risk"><thead><tr>
+              <th>Fund</th><th class="num">Max DD</th><th class="num">Time to Trough</th>
+              <th class="num">Recovery</th><th class="num">Ann. Std Dev</th><th class="num">Downside Capture</th>
+            </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Return Metrics</h2>
+            <div style="overflow-x:auto;">
+            <table id="tbl-ret"><thead><tr>
+              <th>Fund</th><th class="num">YTD</th><th class="num">1Y</th>
+              <th class="num">3Y</th><th class="num">Ann. Incep.</th><th class="num">Total Incep.</th>
+            </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAGE 4: FUND DETAILS -->
+      <section class="page" id="page-fund">
+        <div class="subtitle">Single-fund total return index vs. benchmark</div>
+        <div style="margin-bottom:18px;"><select id="fund-select"><option>Loading…</option></select></div>
+        <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;" id="fund-kpis">
+          <div class="kpi"><div class="label">Latest NAV / Share</div><div class="value sm" id="fk-nav">—</div></div>
+          <div class="kpi"><div class="label">Annualized Since Inception</div><div class="value sm" id="fk-cagr">—</div></div>
+          <div class="kpi"><div class="label">Strategy</div><div class="value sm" id="fk-strat">—</div></div>
+          <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
+        </div>
+        <div class="card"><h2 id="fk-title">Total Return Index</h2><div class="chart-wrap"><canvas id="chart-fund" height="380"></canvas></div></div>
+      </section>
+    </main>
+  </div>
+</div>
 
 <script>
-const PALETTE=["#4f6ef7","#34d399","#f59e0b","#c084fc","#f87171","#22d3ee","#fb923c",
-  "#a3e635","#e879f9","#60a5fa","#facc15","#fb7185","#2dd4bf","#818cf8"];
-Chart.defaults.color="#8b94ad";
+const PALETTE=["#1a5276","#2e86ab","#a23b72","#f18f01","#c73e1d","#3b1f2b",
+  "#44bba4","#e94f37","#393e41","#6b4226","#d4e09b"];
+const POS="#1a5276", NEG="#c0392b", BENCH="#999999";
+Chart.defaults.color="#888";
 Chart.defaults.font.size=11;
-Chart.defaults.borderColor="#27304d";
+Chart.defaults.font.family='-apple-system,"Segoe UI",Arial,sans-serif';
+Chart.defaults.borderColor="#e8ecef";
 
+const TITLES={home:"Home",portfolio:"SGG Portfolio",risk:"Risk & Return",fund:"Fund Details"};
 const charts={};
 const store={};
 
@@ -181,11 +197,11 @@ document.querySelectorAll("nav button").forEach(b=>{
     document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");
     document.getElementById("page-"+b.dataset.page).classList.add("active");
+    document.getElementById("page-title").textContent=TITLES[b.dataset.page];
     render(b.dataset.page);
   });
 });
 
-/* ---------- HOME ---------- */
 async function render(page){
   if(page==="home") return renderHome();
   if(page==="portfolio") return renderPortfolio();
@@ -193,6 +209,7 @@ async function render(page){
   if(page==="fund") return renderFund();
 }
 
+/* ---------- HOME ---------- */
 async function renderHome(){
   if(charts.home) return;
   try{
@@ -209,10 +226,10 @@ async function renderHome(){
     const ds=tri.series.map((s,i)=>({
       label:s.fund_name,
       data:s.data,
-      borderColor:s.benchmark?"#9ca3af":PALETTE[i%PALETTE.length],
-      borderDash:s.benchmark?[6,4]:[],
-      borderWidth:s.benchmark?2:1.6,
-      pointRadius:0,pointHoverRadius:3,tension:.25,spanGaps:true,fill:false,
+      borderColor:s.benchmark?BENCH:PALETTE[i%PALETTE.length],
+      borderDash:s.benchmark?[5,4]:[],
+      borderWidth:s.benchmark?1.5:1.6,
+      pointRadius:0,pointHoverRadius:3,tension:.2,spanGaps:true,fill:false,
     }));
     charts.home=new Chart(document.getElementById("chart-home-tri"),{
       type:"line",
@@ -224,10 +241,10 @@ async function renderHome(){
 
 function lineOpts(o={}){
   return {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
-    plugins:{legend:{display:o.legend!==false,position:"bottom",labels:{boxWidth:12,padding:10,font:{size:10}}},
+    plugins:{legend:{display:o.legend!==false,position:"bottom",labels:{boxWidth:12,padding:10,color:"#444",font:{size:11}}},
       tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(1):"—"}`}}},
-    scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10}},
-      y:{grid:{color:"#1c2440"},ticks:o.dollar?{callback:v=>"$"+(v/1e6).toFixed(0)+"M"}:{}}}};
+    scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,color:"#888"}},
+      y:{grid:{color:"#e8ecef"},ticks:o.dollar?{color:"#888",callback:v=>"$"+(v/1e6).toFixed(0)+"M"}:{color:"#888"}}}};
 }
 
 /* ---------- PORTFOLIO ---------- */
@@ -236,49 +253,44 @@ async function renderPortfolio(){
   charts._port=true;
   try{
     const [p,rm]=await Promise.all([getJSON("/api/portfolio"),getJSON("/api/return_metrics")]);
-    // pie
     charts.pie=new Chart(document.getElementById("chart-pie"),{
-      type:"doughnut",
+      type:"pie",
       data:{labels:p.allocation.map(a=>a.fund_name),
         datasets:[{data:p.allocation.map(a=>a.sgg_nav),
-          backgroundColor:p.allocation.map((a,i)=>PALETTE[i%PALETTE.length]),borderColor:"#0a0f1e",borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:10},padding:6}},
+          backgroundColor:p.allocation.map((a,i)=>PALETTE[i%PALETTE.length]),borderColor:"#ffffff",borderWidth:1}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:11},color:"#444",padding:6}},
         tooltip:{callbacks:{label:c=>` ${c.label}: ${money(c.parsed)} (${p.allocation[c.dataIndex].pct.toFixed(1)}%)`}}}}
     });
-    // portfolio TRI
     charts.ptri=new Chart(document.getElementById("chart-ptri"),{
       type:"line",
       data:{labels:p.tri.dates,datasets:[{label:"Portfolio TRI",data:p.tri.values,
-        borderColor:"#4f6ef7",backgroundColor:"rgba(79,110,247,.12)",borderWidth:2,fill:true,tension:.25,pointRadius:2}]},
+        borderColor:POS,borderWidth:2,fill:false,tension:.2,pointRadius:2}]},
       options:lineOpts({legend:false})
     });
-    // total nav
     charts.totnav=new Chart(document.getElementById("chart-totnav"),{
       type:"line",
       data:{labels:p.total_nav.dates,datasets:[{label:"Total SGG NAV",data:p.total_nav.values,
-        borderColor:"#34d399",backgroundColor:"rgba(52,211,153,.12)",borderWidth:2,fill:true,tension:.25,pointRadius:2}]},
+        borderColor:"#2e86ab",borderWidth:2,fill:false,tension:.2,pointRadius:2}]},
       options:lineOpts({legend:false,dollar:true})
     });
-    // portfolio monthly return bars
     charts.pmret=new Chart(document.getElementById("chart-pmret"),{
       type:"bar",
       data:{labels:p.monthly.dates,datasets:[{label:"Monthly Return",data:p.monthly.returns.map(r=>r*100),
-        backgroundColor:p.monthly.returns.map(r=>r>=0?"#34d399":"#f87171")}]},
+        backgroundColor:p.monthly.returns.map(r=>r>=0?POS:NEG)}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>" "+c.parsed.y.toFixed(2)+"%"}}},
-        scales:{x:{grid:{display:false}},y:{grid:{color:"#1c2440"},ticks:{callback:v=>v.toFixed(1)+"%"}}}}
+        scales:{x:{grid:{display:false},ticks:{color:"#888"}},y:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}}}}
     });
-    // last return by fund (sorted desc, horizontal)
     const lr=rm.metrics.filter(m=>m.last_monthly_return!=null)
       .sort((a,b)=>b.last_monthly_return-a.last_monthly_return);
     charts.lastret=new Chart(document.getElementById("chart-lastret"),{
       type:"bar",
       data:{labels:lr.map(m=>m.fund_name),datasets:[{label:"Last Monthly Return",
         data:lr.map(m=>m.last_monthly_return*100),
-        backgroundColor:lr.map(m=>m.last_monthly_return>=0?"#34d399":"#f87171")}]},
+        backgroundColor:lr.map(m=>m.last_monthly_return>=0?POS:NEG)}]},
       options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>" "+c.parsed.x.toFixed(2)+"%"}}},
-        scales:{x:{grid:{color:"#1c2440"},ticks:{callback:v=>v.toFixed(1)+"%"}},y:{grid:{display:false}}}}
+        scales:{x:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}},y:{grid:{display:false},ticks:{color:"#888"}}}}
     });
   }catch(e){ console.error(e); charts._port=false; }
 }
@@ -336,18 +348,18 @@ async function loadFund(fid){
   document.getElementById("fk-title").textContent=`Total Return Index — ${f.fund_name??""}`;
 
   const t=await getJSON("/api/tri/"+fid);
-  const ds=[{label:t.fund.fund_name,data:t.fund.data,borderColor:"#4f6ef7",
-    backgroundColor:"rgba(79,110,247,.10)",borderWidth:2,fill:true,tension:.25,pointRadius:0,spanGaps:true}];
-  if(t.benchmark){ds.push({label:"Pitchbook Index",data:t.benchmark.data,borderColor:"#9ca3af",
-    borderDash:[6,4],borderWidth:2,fill:false,tension:.25,pointRadius:0,spanGaps:true});}
+  const ds=[{label:t.fund.fund_name,data:t.fund.data,borderColor:POS,
+    borderWidth:2,fill:false,tension:.2,pointRadius:0,spanGaps:true}];
+  if(t.benchmark){ds.push({label:"Pitchbook Index",data:t.benchmark.data,borderColor:BENCH,
+    borderDash:[5,4],borderWidth:1.5,fill:false,tension:.2,pointRadius:0,spanGaps:true});}
   if(charts.fund) charts.fund.destroy();
   charts.fund=new Chart(document.getElementById("chart-fund"),{
     type:"line",data:{labels:t.dates,datasets:ds},options:lineOpts({legend:true})});
 }
 
 /* ---------- init ---------- */
-document.getElementById("today").textContent="As of "+new Date().toLocaleDateString("en-US",
-  {weekday:"long",year:"numeric",month:"long",day:"numeric"});
+document.getElementById("asof").textContent="Data as of "+new Date().toLocaleDateString("en-US",
+  {year:"numeric",month:"long",day:"numeric"});
 renderHome();
 </script>
 </body>
