@@ -77,6 +77,13 @@
   .state{padding:24px 0;color:var(--muted);font-size:13px;text-align:center;}
   .err{color:var(--red);}
   .note{background:#fff8e6;border:1px solid #e0c878;color:#8a6d1a;font-size:12px;padding:8px 14px;margin-bottom:16px;}
+  /* custom opt-in legend */
+  .legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin-top:14px;padding:0 4px;}
+  .legend .item{display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+    font-size:11px;color:#888;font-weight:400;user-select:none;}
+  .legend .item .sw{width:12px;height:12px;border:1.5px solid #ccc;background:transparent;
+    display:inline-block;flex:0 0 auto;}
+  .legend .item.active{color:var(--text);font-weight:700;}
   .row-2{grid-template-columns:1fr 1fr;}
   @media(max-width:1000px){.home-grid,.row-2{grid-template-columns:1fr;}}
   @media(max-width:760px){.sidebar{position:static;width:100%;height:auto;}.content{margin-left:0;}}
@@ -112,11 +119,13 @@
           <div class="card">
             <h2>Total Return Index — All Funds (base 100 at inception)</h2>
             <div class="chart-wrap"><canvas id="chart-home-tri" height="360"></canvas></div>
+            <div class="legend" id="legend-home"></div>
           </div>
         </div>
         <div class="card" style="margin-top:16px;">
           <h2>Normalized Performance — Base 100 at Common Start Date</h2>
           <div class="chart-wrap"><canvas id="chart-home-norm" height="360"></canvas></div>
+          <div class="legend" id="legend-norm"></div>
         </div>
       </section>
 
@@ -246,8 +255,9 @@ async function renderHome(){
     charts.home=new Chart(document.getElementById("chart-home-tri"),{
       type:"line",
       data:{labels:tri.dates,datasets:ds},
-      options:lineOpts({legend:true})
+      options:lineOpts({legend:false})
     });
+    buildLegend("legend-home", charts.home, ()=>charts.home.update());
 
     // Normalized chart — rebased to 100 at the common start of selected funds.
     const normDs=tri.series.map((s,i)=>({
@@ -261,18 +271,41 @@ async function renderHome(){
       borderWidth:s.benchmark?1.5:1.6,
       pointRadius:0,pointHoverRadius:3,tension:.2,spanGaps:true,fill:false,
     }));
-    const normOpts=lineOpts({legend:true});
-    normOpts.plugins.legend.onClick=(e,item,legend)=>{
-      const ci=legend.chart, d=ci.data.datasets[item.datasetIndex];
-      d.hidden=!d.hidden; recomputeNorm(ci);
-    };
     charts.norm=new Chart(document.getElementById("chart-home-norm"),{
       type:"line",
       data:{labels:tri.dates,datasets:normDs},
-      options:normOpts
+      options:lineOpts({legend:false})
     });
+    buildLegend("legend-norm", charts.norm, ()=>recomputeNorm(charts.norm));
     recomputeNorm(charts.norm);
   }catch(e){ console.error(e); }
+}
+
+// Custom opt-in legend: outlined box + normal text when off; filled box + bold when on.
+function buildLegend(containerId, chart, afterToggle){
+  const el=document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML="";
+  chart.data.datasets.forEach((ds)=>{
+    const color=ds.borderColor;
+    const item=document.createElement("div");
+    item.className="item"+(ds.hidden?"":" active");
+    const sw=document.createElement("span");
+    sw.className="sw";
+    sw.style.borderColor=color;
+    sw.style.background=ds.hidden?"transparent":color;
+    const lab=document.createElement("span");
+    lab.textContent=ds.label;
+    item.appendChild(sw); item.appendChild(lab);
+    item.addEventListener("click",()=>{
+      ds.hidden=!ds.hidden;
+      const active=!ds.hidden;
+      item.classList.toggle("active",active);
+      sw.style.background=active?color:"transparent";
+      if(afterToggle) afterToggle(); else chart.update();
+    });
+    el.appendChild(item);
+  });
 }
 
 // Rebase each selected fund (and the benchmark) to 100 at the common start —
