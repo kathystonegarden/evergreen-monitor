@@ -402,13 +402,18 @@ def _portfolio(perf, meta):
             ptri.append(ptri[-1] * (1.0 + port_rets[i]))
             ptri_dates.append(port_dates[i])
 
-    # Total SGG NAV by month.
+    # Total SGG NAV by month — include a month ONLY if every fund flagged
+    # sgg_holding=='y' has a non-null sgg_nav that month. Sum across holdings.
+    holdings = [
+        int(r["fund_id"])
+        for _, r in meta.iterrows()
+        if str(r.get("sgg_holding")).strip().lower() == "y"
+    ]
     tot_dates, tot_vals = [], []
     for m in months_all:
-        s = sum(nav_map[fid].get(m, 0.0) for fid in nav_map)
-        if s > 0:
+        if holdings and all(m in nav_map.get(fid, {}) for fid in holdings):
             tot_dates.append(m)
-            tot_vals.append(s)
+            tot_vals.append(sum(nav_map[fid][m] for fid in holdings))
 
     # Current allocation = latest sgg_nav per fund.
     alloc = []

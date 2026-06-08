@@ -102,7 +102,6 @@
     <main>
       <!-- PAGE 1: HOME -->
       <section class="page active" id="page-home">
-        <div class="subtitle">Total return index across all evergreen holdings, base 100 at each fund's inception.</div>
         <div id="bench-note"></div>
         <div class="grid home-grid">
           <div class="home-kpis">
@@ -114,6 +113,10 @@
             <h2>Total Return Index — All Funds (base 100 at inception)</h2>
             <div class="chart-wrap"><canvas id="chart-home-tri" height="360"></canvas></div>
           </div>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <h2>Normalized Performance — Base 100 at Common Start Date</h2>
+          <div class="chart-wrap"><canvas id="chart-home-norm" height="360"></canvas></div>
         </div>
       </section>
 
@@ -175,7 +178,9 @@
 <script>
 const PALETTE=["#1a5276","#2e86ab","#a23b72","#f18f01","#c73e1d","#3b1f2b",
   "#44bba4","#e94f37","#393e41","#6b4226","#d4e09b"];
-const POS="#1a5276", NEG="#c0392b", BENCH="#999999";
+const POS="#1a5276", NEG="#c0392b", BENCH="#999999", GREEN="#1a7a4a";
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtMonth(s){ if(s==null) return s; const p=String(s).split("-"); if(p.length>=2){ const m=parseInt(p[1],10); if(m>=1&&m<=12) return MON[m-1]+" "+p[0]; } return s; }
 Chart.defaults.color="#888";
 Chart.defaults.font.size=11;
 Chart.defaults.font.family='-apple-system,"Segoe UI",Arial,sans-serif';
@@ -219,16 +224,20 @@ async function renderHome(){
     const [kpi,tri]=await Promise.all([getJSON("/api/kpis"),getJSON("/api/tri")]);
     document.getElementById("kpi-holdings").textContent=kpi.holdings_tracked ?? "—";
     const ret=document.getElementById("kpi-return");
-    ret.textContent=signed(kpi.last_month_portfolio_return);
-    ret.className="value "+cls(kpi.last_month_portfolio_return);
+    const lmpr=kpi.last_month_portfolio_return;
+    ret.textContent=signed(lmpr);
+    ret.className="value";
+    ret.style.color = lmpr==null ? "#666" : (lmpr>0?GREEN : (lmpr<0?NEG : "#000"));
     document.getElementById("kpi-nav").textContent=moneyM(kpi.current_total_sgg_nav);
     if(!tri.benchmark_available){
       document.getElementById("bench-note").innerHTML=
         '<div class="note">Pitchbook benchmark sheet not present in the workbook — benchmark line and downside-capture are omitted. They will populate automatically once a <code>pitchbook_tri_index</code> sheet is added.</div>';
     }
+    // Opt-in legend: every series starts HIDDEN; click a legend item to add it.
     const ds=tri.series.map((s,i)=>({
       label:s.fund_name,
       data:s.data,
+      hidden:true,
       borderColor:s.benchmark?BENCH:PALETTE[i%PALETTE.length],
       borderDash:s.benchmark?[5,4]:[],
       borderWidth:s.benchmark?1.5:1.6,
@@ -239,14 +248,59 @@ async function renderHome(){
       data:{labels:tri.dates,datasets:ds},
       options:lineOpts({legend:true})
     });
+
+    // Normalized chart — rebased to 100 at the common start of selected funds.
+    const normDs=tri.series.map((s,i)=>({
+      label:s.fund_name,
+      _raw:s.data,
+      _benchmark:!!s.benchmark,
+      data:s.data.map(()=>null),
+      hidden:true,
+      borderColor:s.benchmark?BENCH:PALETTE[i%PALETTE.length],
+      borderDash:s.benchmark?[5,4]:[],
+      borderWidth:s.benchmark?1.5:1.6,
+      pointRadius:0,pointHoverRadius:3,tension:.2,spanGaps:true,fill:false,
+    }));
+    const normOpts=lineOpts({legend:true});
+    normOpts.plugins.legend.onClick=(e,item,legend)=>{
+      const ci=legend.chart, d=ci.data.datasets[item.datasetIndex];
+      d.hidden=!d.hidden; recomputeNorm(ci);
+    };
+    charts.norm=new Chart(document.getElementById("chart-home-norm"),{
+      type:"line",
+      data:{labels:tri.dates,datasets:normDs},
+      options:normOpts
+    });
+    recomputeNorm(charts.norm);
   }catch(e){ console.error(e); }
+}
+
+// Rebase each selected fund (and the benchmark) to 100 at the common start —
+// the first month where ALL selected funds have TRI data. 1 fund => its inception.
+function recomputeNorm(ci){
+  const dss=ci.data.datasets;
+  const funds=dss.filter(d=>!d._benchmark && !d.hidden);
+  const n=dss.length?dss[0]._raw.length:0;
+  let start=-1;
+  if(funds.length===1){
+    start=funds[0]._raw.findIndex(v=>v!=null);
+  }else if(funds.length>=2){
+    for(let i=0;i<n;i++){ if(funds.every(d=>d._raw[i]!=null)){ start=i; break; } }
+  }
+  dss.forEach(d=>{
+    if(d.hidden || start<0){ d.data=d._raw.map(()=>null); return; }
+    const base=d._raw[start];
+    if(base==null){ d.data=d._raw.map(()=>null); return; }
+    d.data=d._raw.map((v,i)=> (i>=start && v!=null)? v/base*100 : null);
+  });
+  ci.update();
 }
 
 function lineOpts(o={}){
   return {responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
     plugins:{legend:{display:o.legend!==false,position:"bottom",labels:{boxWidth:12,padding:10,color:"#444",font:{size:11}}},
       tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y!=null?c.parsed.y.toFixed(1):"—"}`}}},
-    scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,color:"#888"}},
+    scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,color:"#888",callback:function(v){return fmtMonth(this.getLabelForValue(v));}}},
       y:{grid:{color:"#e8ecef"},ticks:o.dollar?{color:"#888",callback:v=>"$"+(v/1e6).toFixed(0)+"M"}:{color:"#888"}}}};
 }
 
@@ -279,10 +333,10 @@ async function renderPortfolio(){
     charts.pmret=new Chart(document.getElementById("chart-pmret"),{
       type:"bar",
       data:{labels:p.monthly.dates,datasets:[{label:"Monthly Return",data:p.monthly.returns.map(r=>r*100),
-        backgroundColor:p.monthly.returns.map(r=>r>=0?POS:NEG)}]},
+        backgroundColor:p.monthly.returns.map(r=>r>=0?GREEN:NEG)}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>" "+c.parsed.y.toFixed(2)+"%"}}},
-        scales:{x:{grid:{display:false},ticks:{color:"#888"}},y:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}}}}
+        scales:{x:{grid:{display:false},ticks:{color:"#888",callback:function(v){return fmtMonth(this.getLabelForValue(v));}}},y:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}}}}
     });
     const lr=rm.metrics.filter(m=>m.last_monthly_return!=null)
       .sort((a,b)=>b.last_monthly_return-a.last_monthly_return);
@@ -307,17 +361,17 @@ async function renderRisk(){
     const rb=document.querySelector("#tbl-risk tbody");
     rb.innerHTML=risk.metrics.map(m=>`<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      ${m.max_drawdown!=null?`<td class="num neg">${pct(m.max_drawdown)}</td>`:'<td class="num mut">—</td>'}
+      <td class="num">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
       <td class="num">${m.time_to_trough??"—"}</td>
-      <td class="num">${m.recovery_time??'<span class="mut">—</span>'}</td>
+      <td class="num">${m.recovery_time??"—"}</td>
       <td class="num">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
-      <td class="num">${m.downside_capture_ratio!=null?m.downside_capture_ratio.toFixed(1):'<span class="mut">—</span>'}</td>
+      <td class="num">${m.downside_capture_ratio!=null?m.downside_capture_ratio.toFixed(1):"—"}</td>
     </tr>`).join("");
     const tb=document.querySelector("#tbl-ret tbody");
     tb.innerHTML=ret.metrics.map(m=>`<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      ${td(m.ytd_return)}${td(m.trailing_1y)}${td(m.trailing_3y)}
-      ${td(m.annualized_since_inception)}${td(m.total_return_since_inception)}
+      <td class="num">${pct(m.ytd_return)}</td><td class="num">${pct(m.trailing_1y)}</td><td class="num">${pct(m.trailing_3y)}</td>
+      <td class="num">${pct(m.annualized_since_inception)}</td><td class="num">${pct(m.total_return_since_inception)}</td>
     </tr>`).join("");
   }catch(e){
     document.querySelector("#tbl-risk tbody").innerHTML='<tr><td colspan="6" class="state err">Error loading.</td></tr>';
