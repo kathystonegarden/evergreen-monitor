@@ -27,7 +27,9 @@
     border-left:3px solid transparent;color:var(--sidebar-text);height:40px;padding:0 0 0 20px;
     font-size:13px;cursor:pointer;font-family:inherit;}
   .sidebar button:hover{background:var(--sidebar-active-bg);}
-  .sidebar button.active{background:var(--sidebar-active-bg);color:#fff;border-left-color:var(--teal);}
+  .sidebar button.active{background:var(--sidebar-active-bg);color:#fff;border-left-color:#fff;}
+  .sidebar .logo{background:#fff;padding:14px 16px;display:block;}
+  .sidebar .logo img{width:100%;max-height:64px;object-fit:contain;display:block;}
 
   .content{margin-left:200px;flex:1;min-width:0;}
   .topbar{background:#fff;border-bottom:1px solid var(--card-border);padding:14px 24px;
@@ -84,7 +86,8 @@
 
 <div class="layout">
   <nav class="sidebar">
-    <div class="brand"><div class="b1">SGG</div><div class="b2">Evergreen Monitor</div></div>
+    <div class="logo"><img src="/static/images/sgg.png.jpg" alt="Stone Garden Group"></div>
+    <div class="brand"><div class="b1">Stone Garden Group</div><div class="b2">Evergreen Monitor</div></div>
     <button data-page="home" class="active">Home</button>
     <button data-page="portfolio">SGG Portfolio</button>
     <button data-page="risk">Risk &amp; Return</button>
@@ -99,9 +102,6 @@
     <main>
       <!-- PAGE 1: HOME -->
       <section class="page active" id="page-home">
-        <div class="card" style="display:flex;justify-content:center;padding:20px;margin-bottom:16px;">
-          <img src="/static/images/sgg.png.jpg" alt="Stone Garden Group" style="max-height:90px;width:auto;object-fit:contain;">
-        </div>
         <div class="subtitle">Total return index across all evergreen holdings, base 100 at each fund's inception.</div>
         <div id="bench-note"></div>
         <div class="grid home-grid">
@@ -166,7 +166,7 @@
           <div class="kpi"><div class="label">Strategy</div><div class="value sm" id="fk-strat">—</div></div>
           <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
         </div>
-        <div class="card"><h2 id="fk-title">Total Return Index</h2><div class="chart-wrap"><canvas id="chart-fund" height="380"></canvas></div></div>
+        <div class="card"><h2 id="fk-title">Total Return Index</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-fund"></canvas></div></div>
       </section>
     </main>
   </div>
