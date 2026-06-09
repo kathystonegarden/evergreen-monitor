@@ -28,6 +28,9 @@
     font-size:13px;cursor:pointer;font-family:inherit;}
   .sidebar button:hover{background:var(--sidebar-active-bg);}
   .sidebar button.active{background:var(--sidebar-active-bg);color:#fff;border-left-color:#fff;}
+  .sidebar button.sub{padding-left:40px;font-size:12px;}
+  .sidebar .navhead{display:flex;align-items:center;height:40px;padding:0 0 0 20px;
+    color:var(--sidebar-text);font-size:13px;border-left:3px solid transparent;cursor:default;}
   .sidebar .logo{background:#fff;margin:16px;padding:10px;display:flex;align-items:center;justify-content:center;}
   .sidebar .logo img{max-width:100%;max-height:30px;width:auto;height:auto;object-fit:contain;display:block;}
 
@@ -59,13 +62,13 @@
   #tbl-risk thead th, #tbl-ret thead th{white-space:normal;}
   #fd-risk-table thead th, #fd-ret-table thead th{white-space:normal;}
   #tbl-risk-summary, #tbl-ret-summary{border-top:1px solid var(--card-border);}
+  .footnote{font-size:11px;color:var(--muted);margin-top:16px;}
+  .footnote sup{font-size:9px;}
   .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
   .kpi .value{font-size:24px;font-weight:700;margin-top:8px;color:var(--text);font-variant-numeric:tabular-nums;}
   .kpi .value.sm{font-size:18px;}
 
-  .home-grid{grid-template-columns:240px 1fr;align-items:stretch;}
-  .home-kpis{display:flex;flex-direction:column;gap:16px;}
-  .home-kpis .kpi{flex:1;display:flex;flex-direction:column;justify-content:center;}
+  .kpi-row{grid-template-columns:repeat(4,1fr);}
 
   .chart-wrap{position:relative;width:100%;}
   canvas{width:100%!important;}
@@ -96,7 +99,7 @@
     display:inline-block;flex:0 0 auto;}
   .legend .item.active{color:var(--text);font-weight:700;}
   .row-2{grid-template-columns:1fr 1fr;}
-  @media(max-width:1000px){.home-grid,.row-2{grid-template-columns:1fr;}}
+  @media(max-width:1000px){.row-2{grid-template-columns:1fr;}.kpi-row{grid-template-columns:repeat(2,1fr);}}
   @media(max-width:760px){.sidebar{position:static;width:100%;height:auto;}.content{margin-left:0;}}
 </style>
 </head>
@@ -108,7 +111,10 @@
     <div class="brand"><div class="b1">Stone Garden Group</div><div class="b2">Evergreen Monitor</div></div>
     <button data-page="home" class="active">Home</button>
     <button data-page="portfolio">SGG Portfolio</button>
-    <button data-page="risk">Fund Overview</button>
+    <div class="navhead">Fund Comparisons</div>
+    <button data-page="returns" class="sub">Returns</button>
+    <button data-page="risk" class="sub">Risks</button>
+    <button data-page="distributions" class="sub">Distributions and Redemptions</button>
     <button data-page="fund">Fund Details</button>
   </nav>
 
@@ -122,23 +128,21 @@
       <!-- PAGE 1: HOME -->
       <section class="page active" id="page-home">
         <div id="bench-note"></div>
-        <div class="grid home-grid">
-          <div class="home-kpis">
-            <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
-            <div class="kpi"><div class="label">Benchmarks</div><div class="value" id="kpi-benchmarks">1</div></div>
-            <div class="kpi"><div class="label">Last Month Portfolio Return</div><div class="value" id="kpi-return">—</div></div>
-            <div class="kpi"><div class="label">Current Total SGG NAV</div><div class="value" id="kpi-nav">—</div></div>
+        <div class="grid kpi-row" style="margin-bottom:16px;">
+          <div class="kpi"><div class="label">Current Total SGG NAV</div><div class="value" id="kpi-nav">—</div></div>
+          <div class="kpi"><div class="label">Last Month Portfolio Return</div><div class="value" id="kpi-return">—</div></div>
+          <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
+          <div class="kpi"><div class="label">Benchmarks</div><div class="value" id="kpi-benchmarks">1</div></div>
+        </div>
+        <div class="grid row-2">
+          <div class="card">
+            <h2>Normalized Total Returns</h2>
+            <div class="chart-wrap"><canvas id="chart-home-norm" height="360"></canvas></div>
+            <div class="legend" id="legend-norm"></div>
           </div>
-          <div class="grid" style="gap:16px;align-content:start;">
-            <div class="card">
-              <h2>Normalized Total Returns</h2>
-              <div class="chart-wrap"><canvas id="chart-home-norm" height="360"></canvas></div>
-              <div class="legend" id="legend-norm"></div>
-            </div>
-            <div class="card">
-              <h2>Last Monthly Return by Fund</h2>
-              <div class="chart-wrap"><canvas id="chart-lastret" height="340"></canvas></div>
-            </div>
+          <div class="card">
+            <h2>Last Monthly Return by Fund</h2>
+            <div class="chart-wrap"><canvas id="chart-lastret" height="360"></canvas></div>
           </div>
         </div>
       </section>
@@ -156,17 +160,17 @@
         </div>
       </section>
 
-      <!-- PAGE 3: RISK & RETURN -->
+      <!-- PAGE 3: RISK METRICS -->
       <section class="page" id="page-risk">
         <div class="grid">
           <div class="card">
-            <h2>Risk Metrics</h2>
+            <h2>Risks</h2>
             <div style="overflow-x:auto;">
             <table id="tbl-risk" style="table-layout:fixed;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
               <thead><tr>
               <th>Fund</th><th class="num">Max Drawdown</th><th class="num">Time to Trough (months)</th>
-              <th class="num">Recovery (months)</th><th class="num">Standard Deviation (ann.)</th><th class="num">Downside Capture</th>
+              <th class="num">Recovery (months)</th><th class="num">Standard Deviation (ann.)</th><th class="num">Downside Capture<sup>1</sup></th>
             </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
             <table id="tbl-risk-summary" style="table-layout:fixed;margin-top:8px;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
@@ -174,8 +178,15 @@
             </table>
             </div>
           </div>
+        </div>
+        <div class="footnote"><sup>1</sup> Downside capture calculated against the Morningstar PitchBook US Evergreen Fund Index. Downside capture measures how much of the benchmark's downside a fund captured during negative benchmark months.</div>
+      </section>
+
+      <!-- PAGE 3b: RETURN METRICS -->
+      <section class="page" id="page-returns">
+        <div class="grid">
           <div class="card">
-            <h2>Return Metrics</h2>
+            <h2>Returns</h2>
             <div style="overflow-x:auto;">
             <table id="tbl-ret" style="table-layout:fixed;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
@@ -226,7 +237,7 @@
         <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;" id="fund-kpis">
           <div class="kpi"><div class="label">Latest NAV / Share</div><div class="value sm" id="fk-nav">—</div></div>
           <div class="kpi"><div class="label">Annualized Since Inception</div><div class="value sm" id="fk-cagr">—</div></div>
-          <div class="kpi"><div class="label">Strategy</div><div class="value sm" id="fk-strat">—</div></div>
+          <div class="kpi"><div class="label">Type</div><div class="value sm" id="fk-strat">—</div></div>
           <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
         </div>
         <div class="card"><h2 id="fk-title">Total Returns</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-fund"></canvas></div><div class="legend" id="legend-fund"></div></div>
@@ -236,10 +247,10 @@
           padding: 24px 28px;
           margin-top: 20px;
         ">
-          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#444; margin-bottom:12px;">Risk Metrics</div>
-          <div style="overflow-x:auto;"><table id="fd-risk-table" style="table-layout:fixed;"></table></div>
-          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#444; margin:18px 0 12px;">Return Metrics</div>
+          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#444; margin-bottom:12px;">Return Metrics</div>
           <div style="overflow-x:auto;"><table id="fd-ret-table" style="table-layout:fixed;"></table></div>
+          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#444; margin:18px 0 12px;">Risk Metrics</div>
+          <div style="overflow-x:auto;"><table id="fd-risk-table" style="table-layout:fixed;"></table></div>
         </div>
         <div id="fund-info-panel" style="
           background: white;
@@ -256,7 +267,12 @@
             font-size: 13px;
           "></table>
         </div>
+        <div class="footnote"><sup>1</sup> Downside capture calculated against the Morningstar PitchBook US Evergreen Fund Index. Downside capture measures how much of the benchmark's downside a fund captured during negative benchmark months.</div>
       </section>
+
+      <!-- PAGE: DISTRIBUTIONS AND REDEMPTIONS -->
+      <section class="page" id="page-distributions"></section>
+
     </main>
   </div>
 </div>
@@ -272,21 +288,25 @@ Chart.defaults.font.size=11;
 Chart.defaults.font.family='-apple-system,"Segoe UI",Arial,sans-serif';
 Chart.defaults.borderColor="#e8ecef";
 
-const TITLES={home:"Home",portfolio:"SGG Portfolio",risk:"Fund Overview",fund:"Fund Details"};
+const TITLES={home:"Home",portfolio:"SGG Portfolio",risk:"Risks",returns:"Returns",fund:"Fund Details",distributions:"Distributions and Redemptions"};
 const charts={};
 const store={};
 let logoMap={};
 
 // Populate the Fund Information panel for the given fund metadata object.
 function updateFundInfo(fund){
-  fund=fund||{};
+  fund=Object.assign({}, fund||{});
+  // Show the SEC name as the "Fund Name" value (fall back to the short name).
+  fund.fund_name=fund.sec_name||fund.fund_name;
+  // Show the descriptive strategy sentence for this fund.
+  fund.strategy=FUND_STRATEGY[fund.fund_id]||fund.strategy;
   const fields=[
     {label:"Fund Name",      key:"fund_name"},
     {label:"Strategy",       key:"strategy"},
     {label:"Share Class",    key:"share_class"},
     {label:"Fund Type",      key:"fund_type"},
     {label:"Ticker",         key:"ticker"},
-    {label:"CIK",            key:"cik"},
+    {label:"CIK",            key:"cik",            format:"cik"},
     {label:"Inception Date", key:"class_inception_date"},
     {label:"Management Fee", key:"management_fee", format:"percent"},
     {label:"Expense Ratio",  key:"expense_ratio",  format:"percent"},
@@ -298,6 +318,7 @@ function updateFundInfo(fund){
     if(value===null||value===undefined||value==="") return "—";
     if(format==="percent") return (parseFloat(value)*100).toFixed(2)+"%";
     if(format==="link") return `<a href="${value}" target="_blank" style="color:#2C4A6E; text-decoration:none;">${value}</a>`;
+    if(format==="cik") return `<a href="https://www.sec.gov/edgar/browse/?CIK=${value}" target="_blank" style="color:#2C4A6E; text-decoration:none;">${value}</a>`;
     if(typeof value==="string" && value.includes("T00:00:00")){
       const d=new Date(value);
       return d.toLocaleDateString("en-US",{month:"short",year:"numeric"});
@@ -347,7 +368,7 @@ function updateFundMetrics(fid){
     {label:"Time to Trough (months)", val:rk&&rk.time_to_trough!=null?rk.time_to_trough:"—"},
     {label:"Recovery (months)",       val:rk&&rk.recovery_time!=null?rk.recovery_time:"—"},
     {label:"Standard Deviation (ann.)",val:rk&&rk.annualized_std_dev!=null?pct(rk.annualized_std_dev):"—"},
-    {label:"Downside Capture",        val:rk&&typeof rk.downside_capture_ratio==="number"?rk.downside_capture_ratio.toFixed(1)+"%":"—"},
+    {label:"Downside Capture<sup>1</sup>", val:rk&&typeof rk.downside_capture_ratio==="number"?rk.downside_capture_ratio.toFixed(1)+"%":"—"},
   ];
   const retCols=[
     {label:"YTD",                        val:rt?pct(rt.ytd_return):"—"},
@@ -400,6 +421,25 @@ const FUND_COLORS={
   10:"#6B7FA6",  // Hamilton Lane — Denim Blue
   11:"#C4973F",  // JPMF — Muted Amber
 };
+// Strategy descriptions by fund_id (shown on the Fund Details page).
+const FUND_STRATEGY={
+  1:`Broad exposure to private equity via direct investments, secondary purchases, primary fund commitments, and liquid/semi-liquid investments; seeks long-term capital appreciation across multiple sectors, geographies, and vintage years.`,
+  2:`Global private equity fund-of-funds investing across primaries, secondaries, and direct co-investments; middle-market focus; managed by AlpInvest on Carlyle's platform; seeks long-term capital appreciation.`,
+  3:`Fund-of-funds investing in lending strategies across corporate, real asset, and alternative credit; seeks high current income and modest capital appreciation with a secondary objective of capital preservation; income-oriented with monthly distributions.`,
+  4:`Actively managed portfolio of private equity assets acquired primarily through secondary transactions; seeks long-term capital appreciation with vintage diversification and greater liquidity than traditional PE funds.`,
+  5:`Multi-lender, open-architecture private credit fund investing in senior secured direct lending and specialty credit; seeks current income and long-term capital appreciation via floating-rate, diversified credit exposure.`,
+  6:`Diversified private markets fund spanning private equity, real assets, and private debt; dynamically allocates across primaries, secondaries, and co-investments; seeks long-term capital appreciation via StepStone's global GP network.`,
+  7:`Venture capital and growth equity portfolio focused on the "innovation economy"; invests across primaries, secondaries, and direct investments diversified by stage, size, and geography; seeks long-term capital appreciation.`,
+  8:`Core private equity portfolio investing in primaries, secondaries, co-investments, and infrastructure funds globally via Pantheon's platform; seeks long-term capital appreciation.`,
+  9:`Private equity-focused fund investing principally in secondary PE funds, co-investments, and primary fund commitments; managed by Franklin Templeton and Lexington Partners; seeks long-term capital appreciation.`,
+  10:`Diversified private equity portfolio targeting capital appreciation over the medium and long term through direct co-investments and secondaries globally; leverages Hamilton Lane's broader private markets platform.`,
+  11:`Actively managed private equity portfolio investing in secondaries, co-investments, and primaries with a small-to-mid-market focus; also includes private equity and venture capital strategies; seeks long-term capital appreciation.`,
+};
+// Page-title overrides by fund_id (the Fund Information panel still shows the
+// full SEC name). E.g. AMG Pantheon's title omits the LLC entity suffix.
+const FUND_TITLE_OVERRIDE={
+  8:"AMG Pantheon Fund",
+};
 function buildColorMap(funds){
   store.colorByFund=Object.assign({}, FUND_COLORS);
   // Fallback for any fund_id not in the fixed map.
@@ -446,7 +486,7 @@ async function render(page){
   updateAsOf(page);
   if(page==="home") return renderHome();
   if(page==="portfolio") return renderPortfolio();
-  if(page==="risk") return renderRisk();
+  if(page==="risk"||page==="returns") return renderRisk();
   if(page==="fund") return renderFund();
 }
 
@@ -690,7 +730,7 @@ async function renderRisk(){
     const [risk,ret]=await Promise.all([getJSON("/api/risk_metrics"),getJSON("/api/return_metrics")]);
     const rb=document.querySelector("#tbl-risk tbody");
     rb.innerHTML=risk.metrics.map((m,i)=>`<tr>
-      <td><strong style="color:${fundColor(m.fund_id,i)}">${m.fund_name??"—"}</strong></td>
+      <td><strong>${m.fund_name??"—"}</strong></td>
       <td class="num">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
       <td class="num">${m.time_to_trough??"—"}</td>
       <td class="num">${m.recovery_time??"—"}</td>
@@ -706,7 +746,7 @@ async function renderRisk(){
       ]);
     const tb=document.querySelector("#tbl-ret tbody");
     tb.innerHTML=ret.metrics.map((m,i)=>`<tr>
-      <td><strong style="color:${fundColor(m.fund_id,i)}">${m.fund_name??"—"}</strong></td>
+      <td><strong>${m.fund_name??"—"}</strong></td>
       <td class="num">${pct(m.ytd_return)}</td><td class="num">${pct(m.trailing_1y)}</td><td class="num">${pct(m.trailing_3y)}</td>
       <td class="num">${pct(m.annualized_since_inception)}</td><td class="num">${pct(m.total_return_since_inception)}</td>
     </tr>`).join("");
@@ -741,14 +781,14 @@ async function renderFund(){
 
 async function loadFund(fid){
   const f=store.fundsById[fid]||{}, n=store.navById[fid]||{}, r=store.retById[fid]||{};
-  document.getElementById("fund-name").textContent=f.fund_name??"—";
+  document.getElementById("fund-name").textContent=FUND_TITLE_OVERRIDE[fid]||f.sec_name||f.fund_name||"—";
   updateFundLogo(fid);
   updateFundMetrics(fid);
   updateFundInfo(f);
   document.getElementById("fk-nav").textContent=n.nav_per_share!=null?"$"+n.nav_per_share.toFixed(2):"—";
   const cg=document.getElementById("fk-cagr");
   cg.textContent=pct(r.annualized_since_inception); cg.className="value sm";
-  document.getElementById("fk-strat").textContent=f.strategy?f.strategy.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()):"—";
+  document.getElementById("fk-strat").textContent=f.fund_type||"—";
   const lmr=document.getElementById("fk-lmr");
   lmr.textContent=signed(r.last_monthly_return); lmr.className="value sm";
   lmr.style.color = r.last_monthly_return==null ? "#666" : (r.last_monthly_return>=0?GREEN:NEG);

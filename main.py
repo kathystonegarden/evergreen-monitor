@@ -309,6 +309,7 @@ def get_funds():
             {
                 "fund_id": int(r["fund_id"]),
                 "fund_name": sval(r, "fund_name"),
+                "sec_name": sval(r, "sec_name"),
                 "strategy": sval(r, "strategy"),
                 "share_class": sval(r, "share_class"),
                 "fund_type": sval(r, "fund_type"),
