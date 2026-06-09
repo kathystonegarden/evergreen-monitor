@@ -24,6 +24,24 @@ PERF_SHEET = "fund_performance"
 META_SHEET = "fund_metadata"
 PB_SHEET = "pitchbook_tri_index"
 
+# Original purchase amounts by fund_id. Used as the fallback beginning-of-month
+# NAV for a fund's first held month, when there is no prior-month sgg_nav.
+# This is the ONLY hardcoded data in the portfolio calculation — everything else
+# reads dynamically from the workbook.
+PURCHASE_AMOUNTS = {
+    1: 5000000,    # Bow River
+    2: 5000000,    # Carlyle AlpInvest
+    3: 10000000,   # Cliffwater
+    4: 10000000,   # Coller
+    5: 5000000,    # StepStone PC Income
+    6: 10000000,   # StepStone Private Markets
+    7: 5000000,    # StepStone PV/Growth
+    8: 10000000,   # AMG Pantheon
+    9: 10000000,   # FLEX
+    10: 10000000,  # Hamilton Lane
+    11: 10000000,  # JPMF
+}
+
 app = FastAPI(title="SGG Evergreen Monitor")
 
 
@@ -209,6 +227,37 @@ def benchmark_returns(bench):
     return out
 
 
+def downside_capture(g, bret):
+    """
+    Downside capture for one fund's performance group `g` against the
+    benchmark monthly-return map `bret` (month_end -> benchmark return).
+
+    Uses the fund's RAW `monthly_return` column (not NAV-derived returns).
+    Aligns by month_end on months where the fund has a non-null monthly_return
+    AND the benchmark has a calculable return. Among benchmark-down months
+    (benchmark return < 0):
+
+        pct = mean(fund returns) / mean(benchmark returns) * 100
+
+    Returns the pct rounded to 1 decimal as a float, or the string "n/a" when
+    there are no benchmark-down months in the aligned history. Never None.
+    """
+    if "monthly_return" not in g.columns:
+        return "n/a"
+    fund_ret = {
+        pd.Timestamp(row["month_end"]): float(row["monthly_return"])
+        for _, row in g.iterrows()
+        if pd.notna(row["month_end"]) and pd.notna(row["monthly_return"])
+    }
+    # Aligned history: months present in both series.
+    down = [(fund_ret[m], bret[m]) for m in fund_ret if m in bret and bret[m] < 0]
+    if not down:
+        return "n/a"
+    f_avg = sum(d[0] for d in down) / len(down)
+    b_avg = sum(d[1] for d in down) / len(down)
+    return round(f_avg / b_avg * 100.0, 1)
+
+
 # ─────────────────────────────────────────────────────────────── endpoints ──
 @app.get("/api/funds")
 def get_funds():
@@ -357,43 +406,87 @@ def get_tri_fund(fund_id: int):
 
 
 def _portfolio(perf, meta):
-    name = dict(zip(meta["fund_id"], meta["fund_name"]))
-    series = _all_fund_series(perf, meta)
+    """
+    Purchase-amount-weighted portfolio calculation.
 
-    # Per fund: effective monthly returns + raw sgg_nav by month.
-    ret_map = {}  # fid -> {month: return}
-    for fid, s in series.items():
-        ret_map[fid] = {
-            pd.Timestamp(d): r for d, r in zip(s["dates"], s["returns"]) if r is not None
-        }
+    For each month t, every SGG holding that has a non-null monthly_return that
+    month and has been purchased by month t contributes. Its weight is its
+    beginning-of-month NAV (prior-month sgg_nav, or its original PURCHASE_AMOUNT
+    when there is no prior-month sgg_nav) divided by the sum of beginning-of-month
+    NAVs across all contributing funds that month:
+
+        portfolio_return_t = sum( w_i * monthly_return_i )
+
+    Portfolio TRI chain-links these returns from base 100. Total SGG NAV is the
+    sum of available sgg_nav each month. The allocation pie uses the most recent
+    month where all eleven holdings report an sgg_nav. All series shown on the
+    page are capped at that reference month. Nothing here hardcodes a date.
+    """
+    name = dict(zip(meta["fund_id"], meta["fund_name"]))
+    holdings = list(PURCHASE_AMOUNTS.keys())  # the eleven SGG holdings
+
+    # Per-fund raw maps: monthly_return and sgg_nav keyed by month_end.
+    ret_map = {}  # fid -> {month: raw monthly_return}
     nav_map = {}  # fid -> {month: sgg_nav}
+    first_sgg = {}  # fid -> first month with a non-null sgg_nav (purchase month)
     for fid, g in perf.groupby("fund_id"):
         fid = int(fid)
-        m = {}
+        g = g.sort_values("month_end")
+        rm, nm = {}, {}
         for _, row in g.iterrows():
-            if pd.notna(row["sgg_nav"]) and float(row["sgg_nav"]) > 0:
-                m[pd.Timestamp(row["month_end"])] = float(row["sgg_nav"])
-        nav_map[fid] = m
+            if pd.isna(row["month_end"]):
+                continue
+            m = pd.Timestamp(row["month_end"])
+            if pd.notna(row.get("monthly_return")):
+                rm[m] = float(row["monthly_return"])
+            if pd.notna(row.get("sgg_nav")) and float(row["sgg_nav"]) != 0:
+                nm[m] = float(row["sgg_nav"])
+        ret_map[fid] = rm
+        nav_map[fid] = nm
+        first_sgg[fid] = min(nm) if nm else None
 
-    months_all = sorted({pd.Timestamp(d) for d in perf["month_end"].unique()})
+    months_all = sorted({pd.Timestamp(d) for d in perf["month_end"].dropna().unique()})
 
-    # NAV-weighted portfolio monthly returns (>=3 contributors required).
+    # Reference month for the pie + "data as of" = most recent month where ALL
+    # eleven holdings report an sgg_nav.
+    ref_month = None
+    for t in reversed(months_all):
+        if all(t in nav_map.get(fid, {}) for fid in holdings):
+            ref_month = t
+            break
+
+    def le(d):
+        return ref_month is None or d <= ref_month
+
+    # Portfolio monthly returns, weighted by beginning-of-month NAV.
     port_dates, port_rets = [], []
-    for k in range(1, len(months_all)):
-        t, tp = months_all[k], months_all[k - 1]
-        contribs = [
-            fid
-            for fid in series
-            if tp in nav_map.get(fid, {}) and t in ret_map.get(fid, {})
-        ]
-        if len(contribs) >= 3:
-            total = sum(nav_map[fid][tp] for fid in contribs)
-            if total > 0:
-                r = sum((nav_map[fid][tp] / total) * ret_map[fid][t] for fid in contribs)
-                port_dates.append(t)
-                port_rets.append(r)
+    for k, t in enumerate(months_all):
+        prev_t = months_all[k - 1] if k > 0 else None
+        contribs = []  # (beginning_of_month_nav, monthly_return)
+        for fid in holdings:
+            # Fund must have a return this month and have been purchased by now.
+            if t not in ret_map.get(fid, {}):
+                continue
+            if first_sgg[fid] is None or t < first_sgg[fid]:
+                continue
+            prev_nav = nav_map[fid].get(prev_t) if prev_t is not None else None
+            bom = prev_nav if prev_nav is not None else PURCHASE_AMOUNTS[fid]
+            contribs.append((bom, ret_map[fid][t]))
+        if not contribs:
+            continue
+        denom = sum(b for b, _ in contribs)
+        if denom <= 0:
+            continue
+        r = sum((b / denom) * ret for b, ret in contribs)
+        port_dates.append(t)
+        port_rets.append(r)
 
-    # Portfolio TRI: base 100 at first calculable month, chain-link forward.
+    # Cap the return series at the reference month (no partial future months).
+    capped = [(d, r) for d, r in zip(port_dates, port_rets) if le(d)]
+    port_dates = [d for d, _ in capped]
+    port_rets = [r for _, r in capped]
+
+    # Portfolio TRI: base 100 at first month with a return, chain-link forward.
     ptri_dates, ptri = [], []
     if port_dates:
         ptri_dates.append(port_dates[0])
@@ -402,29 +495,28 @@ def _portfolio(perf, meta):
             ptri.append(ptri[-1] * (1.0 + port_rets[i]))
             ptri_dates.append(port_dates[i])
 
-    # Total SGG NAV by month — include a month ONLY if every fund flagged
-    # sgg_holding=='y' has a non-null sgg_nav that month. Sum across holdings.
-    holdings = [
-        int(r["fund_id"])
-        for _, r in meta.iterrows()
-        if str(r.get("sgg_holding")).strip().lower() == "y"
-    ]
+    # Total SGG NAV = sum of every holding's sgg_nav available that month,
+    # capped at the reference month.
     tot_dates, tot_vals = [], []
     for m in months_all:
-        if holdings and all(m in nav_map.get(fid, {}) for fid in holdings):
+        if not le(m):
+            continue
+        vals = [nav_map[fid][m] for fid in holdings if m in nav_map.get(fid, {})]
+        if vals:
             tot_dates.append(m)
-            tot_vals.append(sum(nav_map[fid][m] for fid in holdings))
+            tot_vals.append(sum(vals))
 
-    # Current allocation = latest sgg_nav per fund.
+    # Allocation pie: each holding's sgg_nav in the reference month.
     alloc = []
-    for fid in nav_map:
-        if nav_map[fid]:
-            last_m = max(nav_map[fid])
-            alloc.append({"fund_id": fid, "fund_name": name.get(fid), "sgg_nav": nav_map[fid][last_m]})
-    tot_alloc = sum(a["sgg_nav"] for a in alloc) or 1.0
-    for a in alloc:
-        a["pct"] = _num(a["sgg_nav"] / tot_alloc * 100.0)
-    alloc.sort(key=lambda x: -x["sgg_nav"])
+    if ref_month is not None:
+        for fid in holdings:
+            v = nav_map.get(fid, {}).get(ref_month)
+            if v is not None:
+                alloc.append({"fund_id": fid, "fund_name": name.get(fid), "sgg_nav": v})
+        tot_alloc = sum(a["sgg_nav"] for a in alloc) or 1.0
+        for a in alloc:
+            a["pct"] = _num(a["sgg_nav"] / tot_alloc * 100.0)
+        alloc.sort(key=lambda x: -x["sgg_nav"])
 
     return {
         "port_dates": port_dates,
@@ -435,6 +527,7 @@ def _portfolio(perf, meta):
         "tot_vals": tot_vals,
         "alloc": alloc,
         "nav_map": nav_map,
+        "ref_month": ref_month,
     }
 
 
@@ -443,7 +536,11 @@ def get_portfolio():
     perf = load_perf()
     meta = load_meta()
     p = _portfolio(perf, meta)
+    ref = p["ref_month"]
     return {
+        # "Portfolio data as of" reference month (most recent month with all
+        # eleven holdings reporting). Everything on the page is capped to it.
+        "as_of": _datestr(ref) if ref is not None else None,
         "monthly": {
             "dates": [_datestr(d) for d in p["port_dates"]],
             "returns": [_num(r) for r in p["port_rets"]],
@@ -483,15 +580,20 @@ def get_risk_metrics():
         std = _num(np.std(rets, ddof=1) * math.sqrt(12)) if len(rets) >= 2 else None
 
         # Downside capture vs benchmark in benchmark-down months.
-        dcr = None
-        if bret:
-            fr = {pd.Timestamp(d): r for d, r in zip(s["dates"], s["returns"]) if r is not None}
-            down = [(fr[m], bret[m]) for m in fr if m in bret and bret[m] < 0]
-            if down:
-                f_avg = np.mean([d[0] for d in down])
-                b_avg = np.mean([d[1] for d in down])
-                if b_avg != 0:
-                    dcr = _num(f_avg / b_avg * 100.0)
+        #
+        # Methodology (must stay dynamic — reads all rows, no hardcoded dates):
+        #   1. Align the fund's RAW monthly_return series with the benchmark's
+        #      calculable monthly returns, by month_end. Only months where BOTH
+        #      the fund has a non-null monthly_return AND the benchmark has a
+        #      calculable return are included ("aligned history").
+        #   2. Benchmark down month = aligned month where benchmark return < 0.
+        #   3. If there are zero benchmark down months -> "n/a".
+        #      Else downside_capture_pct =
+        #         mean(fund returns in down months)
+        #         / mean(benchmark returns in down months) * 100
+        #   4. Return the pct rounded to 1 dp as a float, or the string "n/a".
+        #      Never null.
+        dcr = downside_capture(g, bret)
 
         rows.append(
             {
