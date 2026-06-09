@@ -313,6 +313,7 @@ def get_funds():
                 "share_class": sval(r, "share_class"),
                 "fund_type": sval(r, "fund_type"),
                 "ticker": sval(r, "ticker"),
+                "cik": sval(r, "cik"),
                 "class_inception_date": inc,
                 "management_fee": fval(r, "management_fee"),
                 "expense_ratio": fval(r, "expense_ratio"),
