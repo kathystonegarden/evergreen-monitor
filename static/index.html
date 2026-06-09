@@ -170,7 +170,35 @@
 
       <!-- PAGE 4: FUND DETAILS -->
       <section class="page" id="page-fund">
-        <div class="fund-name" id="fund-name">—</div>
+        <div style="position:relative;">
+          <div class="fund-name" id="fund-name">—</div>
+          <div id="fund-logo-container" style="
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #d0d7de;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 52px;
+            width: 140px;
+          ">
+            <img id="fund-logo-img"
+                 src=""
+                 alt=""
+                 style="
+                   max-height: 36px;
+                   max-width: 120px;
+                   width: auto;
+                   height: auto;
+                   object-fit: contain;
+                   display: block;
+                 "
+                 onerror="document.getElementById('fund-logo-container').style.display='none';">
+          </div>
+        </div>
         <div style="margin-bottom:18px;"><select id="fund-select"><option>Loading…</option></select></div>
         <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;" id="fund-kpis">
           <div class="kpi"><div class="label">Latest NAV / Share</div><div class="value sm" id="fk-nav">—</div></div>
@@ -179,6 +207,21 @@
           <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
         </div>
         <div class="card"><h2 id="fk-title">Total Returns</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-fund"></canvas></div><div class="legend" id="legend-fund"></div></div>
+        <div id="fund-info-panel" style="
+          background: white;
+          border: 1px solid #d0d7de;
+          padding: 24px 28px;
+          margin-top: 20px;
+        ">
+          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:#444; margin-bottom:16px;">
+            Fund Information
+          </div>
+          <table id="fund-info-table" style="
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+          "></table>
+        </div>
       </section>
     </main>
   </div>
@@ -198,6 +241,75 @@ Chart.defaults.borderColor="#e8ecef";
 const TITLES={home:"Home",portfolio:"SGG Portfolio",risk:"Risks and Returns",fund:"Fund Details"};
 const charts={};
 const store={};
+let logoMap={};
+
+// Populate the Fund Information panel for the given fund metadata object.
+function updateFundInfo(fund){
+  fund=fund||{};
+  const fields=[
+    {label:"Fund Name",      key:"fund_name"},
+    {label:"Strategy",       key:"strategy"},
+    {label:"Share Class",    key:"share_class"},
+    {label:"Fund Type",      key:"fund_type"},
+    {label:"Ticker",         key:"ticker"},
+    {label:"Inception Date", key:"class_inception_date"},
+    {label:"Management Fee", key:"management_fee", format:"percent"},
+    {label:"Expense Ratio",  key:"expense_ratio",  format:"percent"},
+    {label:"Incentive Fee",  key:"incentive_fee",  format:"percent"},
+    {label:"Gate",           key:"gate",           format:"percent"},
+    {label:"Website",        key:"website_link",   format:"link"},
+  ];
+  function formatField(value, format){
+    if(value===null||value===undefined||value==="") return "—";
+    if(format==="percent") return (parseFloat(value)*100).toFixed(2)+"%";
+    if(format==="link") return `<a href="${value}" target="_blank" style="color:#2C4A6E; text-decoration:none;">${value}</a>`;
+    if(typeof value==="string" && value.includes("T00:00:00")){
+      const d=new Date(value);
+      return d.toLocaleDateString("en-US",{month:"short",year:"numeric"});
+    }
+    return value;
+  }
+  const rows=fields.map((f,i)=>{
+    const last=i===fields.length-1;
+    const bb=last?"":"border-bottom: 1px solid #f0f0f0;";
+    return `
+    <tr>
+      <td style="
+        padding: 9px 0;
+        color: #888;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        width: 200px;
+        vertical-align: top;
+        ${bb}
+      ">${f.label}</td>
+      <td style="
+        padding: 9px 0 9px 16px;
+        color: #1a1a2e;
+        font-size: 13px;
+        ${bb}
+      ">${formatField(fund[f.key], f.format)}</td>
+    </tr>`;
+  }).join("");
+  const tbl=document.getElementById("fund-info-table");
+  if(tbl) tbl.innerHTML=rows;
+}
+
+// Show the selected fund's logo in the top-right box, or hide the box if none.
+function updateFundLogo(fundId){
+  const container=document.getElementById("fund-logo-container");
+  const img=document.getElementById("fund-logo-img");
+  if(!container||!img) return;
+  const src=logoMap[String(fundId)];
+  if(src){
+    img.src=src;
+    container.style.display="flex";
+  }else{
+    container.style.display="none";
+  }
+}
 
 function pct(x,dp=1){ if(x==null) return "—"; return (x*100).toFixed(dp)+"%"; }
 function signed(x,dp=1){ if(x==null) return "—"; const v=(x*100).toFixed(dp); return (x>=0?"+":"")+v+"%"; }
@@ -519,6 +631,8 @@ async function renderFund(){
 async function loadFund(fid){
   const f=store.fundsById[fid]||{}, n=store.navById[fid]||{}, r=store.retById[fid]||{};
   document.getElementById("fund-name").textContent=f.fund_name??"—";
+  updateFundLogo(fid);
+  updateFundInfo(f);
   document.getElementById("fk-nav").textContent=n.nav_per_share!=null?"$"+n.nav_per_share.toFixed(2):"—";
   const cg=document.getElementById("fk-cagr");
   cg.textContent=pct(r.annualized_since_inception); cg.className="value sm";
@@ -550,6 +664,12 @@ async function init(){
     buildColorMap(funds.funds);
     store.fundsList=funds.funds;
   }catch(e){ console.error(e); }
+  // Fetch fund logos; once loaded, refresh whatever fund is currently selected
+  // (handles the race between this fetch and the initial fund load).
+  fetch("/api/logos")
+    .then(r=>r.json())
+    .then(data=>{ logoMap=data; const sel=document.getElementById("fund-select"); updateFundLogo(sel?sel.value:null); })
+    .catch(e=>console.error(e));
   let saved="home";
   try{ saved=localStorage.getItem("sgg_page")||"home"; }catch(e){}
   activatePage(saved);

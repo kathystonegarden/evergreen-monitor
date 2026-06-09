@@ -42,6 +42,24 @@ PURCHASE_AMOUNTS = {
     11: 10000000,  # JPMF
 }
 
+# Fund logo file base names (extension auto-detected). NOTE: fund 2 uses the
+# actual on-disk spelling "carlyle_alphinvest" (the marketing file is spelled
+# with an 'h'); everything else matches the supplied mapping.
+LOGO_BASENAMES = {
+    1: "Bow_River_Capital_Logo",
+    2: "carlyle_alphinvest",
+    3: "cliffwater",
+    4: "coller_capital_logo",
+    5: "stepstone",
+    6: "stepstone",
+    7: "stepstone",
+    8: "amg_pantheon",
+    9: "flex",
+    10: "hamilton_lane",
+    11: "jpmf",
+}
+SUPPORTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".webp"]
+
 app = FastAPI(title="SGG Evergreen Monitor")
 
 
@@ -262,19 +280,45 @@ def downside_capture(g, bret):
 @app.get("/api/funds")
 def get_funds():
     meta = load_meta()
-    cols = ["fund_id", "fund_name", "strategy", "ticker", "class_inception_date"]
-    cols = [c for c in cols if c in meta.columns]
+
+    def sval(r, c):
+        """String/raw metadata value, or None if missing/blank."""
+        if c not in meta.columns:
+            return None
+        v = r.get(c)
+        if not pd.notna(v):
+            return None
+        if isinstance(v, str):
+            v = v.strip()
+            return v if v else None
+        return v
+
+    def fval(r, c):
+        """Numeric metadata value (e.g. a fee like 0.0175), or None."""
+        if c not in meta.columns:
+            return None
+        return _num(r.get(c)) if pd.notna(r.get(c)) else None
+
     rows = []
-    for _, r in meta[cols].iterrows():
+    for _, r in meta.iterrows():
+        inc = None
+        if "class_inception_date" in meta.columns and pd.notna(r.get("class_inception_date")):
+            # ISO datetime so the front-end formatter renders it as "Jun 2020".
+            inc = pd.Timestamp(r["class_inception_date"]).strftime("%Y-%m-%dT00:00:00")
         rows.append(
             {
                 "fund_id": int(r["fund_id"]),
-                "fund_name": r.get("fund_name") if pd.notna(r.get("fund_name")) else None,
-                "strategy": r.get("strategy") if pd.notna(r.get("strategy")) else None,
-                "ticker": r.get("ticker") if pd.notna(r.get("ticker")) else None,
-                "class_inception_date": _datestr(r["class_inception_date"])
-                if pd.notna(r.get("class_inception_date"))
-                else None,
+                "fund_name": sval(r, "fund_name"),
+                "strategy": sval(r, "strategy"),
+                "share_class": sval(r, "share_class"),
+                "fund_type": sval(r, "fund_type"),
+                "ticker": sval(r, "ticker"),
+                "class_inception_date": inc,
+                "management_fee": fval(r, "management_fee"),
+                "expense_ratio": fval(r, "expense_ratio"),
+                "incentive_fee": fval(r, "incentive_fee"),
+                "gate": fval(r, "gate"),
+                "website_link": sval(r, "website_link"),
             }
         )
     rows.sort(key=lambda x: (x["fund_name"] or "").lower())
@@ -679,6 +723,20 @@ def get_kpis():
         "last_month_portfolio_return": last_port,
         "current_total_sgg_nav": current_total,
     }
+
+
+@app.get("/api/logos")
+def get_logos():
+    """Map fund_id (as string) -> /static/images/<file>, or null if no file."""
+    out = {}
+    for fid, base in LOGO_BASENAMES.items():
+        path = None
+        for ext in SUPPORTED_EXTENSIONS:
+            if os.path.exists(f"static/images/{base}{ext}"):
+                path = f"/static/images/{base}{ext}"
+                break
+        out[str(fid)] = path
+    return out
 
 
 # ───────────────────────────────────────────────────────────── frontend ──
