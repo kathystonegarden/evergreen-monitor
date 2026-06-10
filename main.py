@@ -126,13 +126,17 @@ def fund_series(g):
     """
     Build an inception-anchored monthly series for one fund.
 
+    Only reported monthly_return values are used to chain-link the index. NAV
+    movements are NOT used to impute returns, and months without a reported
+    monthly_return are not carried forward — the series stops at the last month
+    with a real reported return.
+
     Returns dict: dates[], returns[] (effective monthly returns, None at base),
     tri[] (base 100 at inception), inception(Timestamp), or None if no data.
     """
     g = g.sort_values("month_end").reset_index(drop=True)
     nav = g["nav_per_share"]
     ret = g["monthly_return"]
-    dist = g["distributions_per_share"].fillna(0.0)
 
     # Inception = first month with nav_per_share; fall back to first monthly_return.
     if nav.notna().any():
@@ -150,21 +154,18 @@ def fund_series(g):
             r = None
         else:
             r = ret.iloc[i]
-            if pd.notna(r):
-                r = float(r)
-            elif (
-                pd.notna(nav.iloc[i])
-                and pd.notna(nav.iloc[i - 1])
-                and nav.iloc[i - 1] != 0
-            ):
-                r = float((nav.iloc[i] + dist.iloc[i] - nav.iloc[i - 1]) / nav.iloc[i - 1])
-            else:
-                r = None
-            if r is not None:
-                cur = cur * (1.0 + r)
+            if pd.isna(r):
+                # No reported monthly return: do not impute from NAV and do not
+                # carry forward. Reported returns are contiguous, so stop here.
+                break
+            r = float(r)
+            cur = cur * (1.0 + r)
         dates.append(g["month_end"].iloc[i])
         returns.append(r)
         tri.append(cur)
+
+    if not dates:
+        return None
 
     return {
         "dates": dates,
@@ -653,6 +654,7 @@ def get_risk_metrics():
                 "recovery_time": dd["recovery_time"],
                 "annualized_std_dev": std,
                 "downside_capture_ratio": dcr,
+                "as_of": _datestr(s["dates"][-1]),
             }
         )
     rows.sort(key=lambda x: (x["fund_name"] or "").lower())
@@ -664,6 +666,14 @@ def get_return_metrics():
     perf = load_perf()
     meta = load_meta()
     name = dict(zip(meta["fund_id"], meta["fund_name"]))
+
+    # Common as-of month for the "Last Monthly Return by Fund" comparison.
+    # = the most recent month_end that has at least one reported monthly_return
+    # across all funds. Dynamic: auto-advances as funds post new returns, so the
+    # bars always share a single, freshest available as-of date rather than each
+    # fund showing its own latest (which mixes months).
+    reported = perf[perf["monthly_return"].notna()]
+    common_as_of = pd.Timestamp(reported["month_end"].max()) if not reported.empty else None
 
     rows = []
     for fid, g in perf.groupby("fund_id"):
@@ -693,6 +703,15 @@ def get_return_metrics():
 
         last_mr = rets[-1] if rets else None
 
+        # Return for the shared common as-of month (None if this fund hasn't
+        # reported that month yet -> rendered as greyed/pending in the chart).
+        common_mr = None
+        if common_as_of is not None:
+            for d, r in rd:
+                if d == common_as_of:
+                    common_mr = r
+                    break
+
         rows.append(
             {
                 "fund_id": fid,
@@ -704,10 +723,16 @@ def get_return_metrics():
                 "total_return_since_inception": total_ret,
                 "months_since_inception": msi,
                 "last_monthly_return": _num(last_mr),
+                "common_month_return": _num(common_mr),
+                "as_of": _datestr(latest),
             }
         )
     rows.sort(key=lambda x: (x["fund_name"] or "").lower())
-    return {"count": len(rows), "metrics": rows}
+    return {
+        "count": len(rows),
+        "last_return_as_of": _datestr(common_as_of) if common_as_of is not None else None,
+        "metrics": rows,
+    }
 
 
 @app.get("/api/kpis")
@@ -719,11 +744,15 @@ def get_kpis():
     holdings = sum(1 for fid in p["nav_map"] if p["nav_map"][fid])
     last_port = _num(p["port_rets"][-1]) if p["port_rets"] else None
     current_total = _num(p["tot_vals"][-1]) if p["tot_vals"] else None
+    last_port_as_of = _datestr(p["port_dates"][-1]) if p["port_dates"] else None
+    current_total_as_of = _datestr(p["tot_dates"][-1]) if p["tot_dates"] else None
 
     return {
         "holdings_tracked": holdings,
         "last_month_portfolio_return": last_port,
+        "last_month_portfolio_return_as_of": last_port_as_of,
         "current_total_sgg_nav": current_total,
+        "current_total_sgg_nav_as_of": current_total_as_of,
     }
 
 

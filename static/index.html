@@ -32,7 +32,7 @@
   .sidebar .navhead{display:flex;align-items:center;height:40px;padding:0 0 0 20px;
     color:var(--sidebar-text);font-size:13px;border-left:3px solid transparent;cursor:default;}
   .sidebar .logo{background:#fff;margin:16px;padding:10px;display:flex;align-items:center;justify-content:center;}
-  .sidebar .logo img{max-width:100%;max-height:30px;width:auto;height:auto;object-fit:contain;display:block;}
+  .sidebar .logo img{max-width:100%;max-height:40px;width:auto;height:auto;object-fit:contain;display:block;}
 
   .content{margin-left:200px;flex:1;min-width:0;}
   .topbar{background:#fff;border-bottom:1px solid var(--card-border);padding:14px 24px;
@@ -81,6 +81,15 @@
   tbody tr:nth-child(even){background:var(--row-alt);}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
   td.num{font-size:15px;font-weight:600;}
+  /* Bigger hover target on the Returns/Risks metric cells. */
+  #tbl-risk tbody td, #tbl-ret tbody td{padding-top:14px;padding-bottom:14px;}
+  td.tip{cursor:default;}
+  /* Custom styled hover tooltip for metric cells. */
+  .metric-tip{position:fixed;transform:translate(-50%,-100%);pointer-events:none;
+    background:rgba(70,70,70,.82);color:#fff;padding:7px 11px;border-radius:8px;
+    font-size:11px;font-weight:400;letter-spacing:.2px;white-space:nowrap;
+    opacity:0;transition:opacity .1s ease;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.18);}
+  .metric-tip.show{opacity:1;}
   .pos{color:var(--green);} .neg{color:var(--red);} .mut{color:var(--muted);}
   strong{font-weight:700;}
 
@@ -107,7 +116,7 @@
 
 <div class="layout">
   <nav class="sidebar">
-    <div class="logo"><img src="/static/images/sgg.png.jpg" alt="Stone Garden Group"></div>
+    <div class="logo"><img src="/static/images/sgg2.png" alt="Stone Garden Group"></div>
     <div class="brand"><div class="b1">Stone Garden Group</div><div class="b2">Evergreen Monitor</div></div>
     <button data-page="home" class="active">Home</button>
     <button data-page="portfolio">SGG Portfolio</button>
@@ -122,26 +131,28 @@
     <header class="topbar">
       <div class="ptitle" id="page-title">Home</div>
       <div class="asof" id="asof" style="display:none;"></div>
-      <select id="fund-select" style="display:none;"><option>Loading…</option></select>
     </header>
     <main>
       <!-- PAGE 1: HOME -->
       <section class="page active" id="page-home">
         <div id="bench-note"></div>
         <div class="grid kpi-row" style="margin-bottom:16px;">
-          <div class="kpi"><div class="label">Current Total SGG NAV</div><div class="value" id="kpi-nav">—</div></div>
-          <div class="kpi"><div class="label">Last Month Portfolio Return</div><div class="value" id="kpi-return">—</div></div>
+          <div class="kpi"><div class="label">Current Total SGG NAV <span id="kpi-nav-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-nav">—</div></div>
+          <div class="kpi"><div class="label">Last Month Portfolio Return <span id="kpi-return-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-return">—</div></div>
           <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
           <div class="kpi"><div class="label">Benchmarks</div><div class="value" id="kpi-benchmarks">1</div></div>
         </div>
         <div class="grid row-2">
-          <div class="card">
+          <div class="card" style="position:relative;">
             <h2>Normalized Total Returns</h2>
+            <button id="norm-expand" title="Expand" aria-label="Expand chart" style="position:absolute;top:12px;right:12px;background:none;border:none;padding:2px;cursor:pointer;color:var(--muted);line-height:0;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            </button>
             <div class="chart-wrap"><canvas id="chart-home-norm" height="360"></canvas></div>
             <div class="legend" id="legend-norm"></div>
           </div>
           <div class="card">
-            <h2>Last Monthly Return by Fund</h2>
+            <h2>Last Monthly Return by Fund <span id="lastret-asof" style="font-weight:400;color:#888;font-size:12px;"></span></h2>
             <div class="chart-wrap"><canvas id="chart-lastret" height="360"></canvas></div>
           </div>
         </div>
@@ -172,7 +183,7 @@
               <th>Fund</th><th class="num">Max Drawdown</th><th class="num">Time to Trough (months)</th>
               <th class="num">Recovery (months)</th><th class="num">Standard Deviation (ann.)</th><th class="num">Downside Capture<sup>1</sup></th>
             </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
-            <table id="tbl-risk-summary" style="table-layout:fixed;margin-top:8px;">
+            <table id="tbl-risk-summary" style="table-layout:fixed;margin-top:28px;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
               <tbody></tbody>
             </table>
@@ -194,7 +205,7 @@
               <th>Fund</th><th class="num">YTD</th><th class="num">1Y</th>
               <th class="num">3Y</th><th class="num">Since Inception (ann.)</th><th class="num">Since Inception (cumulative)</th>
             </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
-            <table id="tbl-ret-summary" style="table-layout:fixed;margin-top:8px;">
+            <table id="tbl-ret-summary" style="table-layout:fixed;margin-top:28px;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
               <tbody></tbody>
             </table>
@@ -207,38 +218,25 @@
       <section class="page" id="page-fund">
         <div style="position:relative;">
           <div class="fund-name" id="fund-name">—</div>
-          <div id="fund-logo-container" style="
+          <select id="fund-select" style="
             position: absolute;
             top: 0;
             right: 0;
+            min-width: 220px;
+            height: 52px;
+            padding: 6px 12px;
             background: white;
             border: 1px solid #d0d7de;
-            padding: 6px 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 52px;
-            width: 140px;
-          ">
-            <img id="fund-logo-img"
-                 src=""
-                 alt=""
-                 style="
-                   max-height: 36px;
-                   max-width: 120px;
-                   width: auto;
-                   height: auto;
-                   object-fit: contain;
-                   display: block;
-                 "
-                 onerror="document.getElementById('fund-logo-container').style.display='none';">
-          </div>
+            font-size: 14px;
+            color: #222;
+            cursor: pointer;
+          "><option>Loading…</option></select>
         </div>
         <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;" id="fund-kpis">
-          <div class="kpi"><div class="label">Latest NAV / Share</div><div class="value sm" id="fk-nav">—</div></div>
-          <div class="kpi"><div class="label">Annualized Since Inception</div><div class="value sm" id="fk-cagr">—</div></div>
           <div class="kpi"><div class="label">Type</div><div class="value sm" id="fk-strat">—</div></div>
+          <div class="kpi"><div class="label">NAV / Share <span id="fk-nav-asof" style="font-weight:400;color:#888;"></span></div><div class="value sm" id="fk-nav">—</div></div>
           <div class="kpi"><div class="label">Last Monthly Return</div><div class="value sm" id="fk-lmr">—</div></div>
+          <div class="kpi"><div class="label">Annualized Since Inception</div><div class="value sm" id="fk-cagr">—</div></div>
         </div>
         <div class="card"><h2 id="fk-title">Total Returns</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-fund"></canvas></div><div class="legend" id="legend-fund"></div></div>
         <div id="fund-metrics-panel" style="
@@ -274,6 +272,17 @@
       <section class="page" id="page-distributions"></section>
 
     </main>
+    <!-- Fullscreen modal for the Normalized Total Returns chart -->
+    <div id="norm-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.7);">
+      <div id="norm-modal-panel" style="position:absolute;top:5%;left:5%;width:90%;height:90%;background:#fff;border-radius:10px;padding:20px 24px;box-sizing:border-box;display:flex;flex-direction:column;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--th-text,#333);">Normalized Total Returns</div>
+          <button id="norm-modal-close" title="Close" aria-label="Close" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted,#888);padding:0 4px;">&times;</button>
+        </div>
+        <div style="flex:1;min-height:0;position:relative;"><canvas id="chart-norm-modal"></canvas></div>
+        <div class="legend" id="legend-norm-modal" style="margin-top:12px;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -291,7 +300,6 @@ Chart.defaults.borderColor="#e8ecef";
 const TITLES={home:"Home",portfolio:"SGG Portfolio",risk:"Risks",returns:"Returns",fund:"Fund Details",distributions:"Distributions and Redemptions"};
 const charts={};
 const store={};
-let logoMap={};
 
 // Populate the Fund Information panel for the given fund metadata object.
 function updateFundInfo(fund){
@@ -383,20 +391,6 @@ function updateFundMetrics(fid){
   if(ttbl) ttbl.innerHTML=buildMetricTable(retCols);
 }
 
-// Show the selected fund's logo in the top-right box, or hide the box if none.
-function updateFundLogo(fundId){
-  const container=document.getElementById("fund-logo-container");
-  const img=document.getElementById("fund-logo-img");
-  if(!container||!img) return;
-  const src=logoMap[String(fundId)];
-  if(src){
-    img.src=src;
-    container.style.display="flex";
-  }else{
-    container.style.display="none";
-  }
-}
-
 function pct(x,dp=1){ if(x==null) return "—"; return (x*100).toFixed(dp)+"%"; }
 function signed(x,dp=1){ if(x==null) return "—"; const v=(x*100).toFixed(dp); return (x>=0?"+":"")+v+"%"; }
 function money(x){ if(x==null) return "—"; return "$"+Number(x).toLocaleString("en-US",{maximumFractionDigits:0}); }
@@ -423,17 +417,17 @@ const FUND_COLORS={
 };
 // Strategy descriptions by fund_id (shown on the Fund Details page).
 const FUND_STRATEGY={
-  1:`Broad exposure to private equity via direct investments, secondary purchases, primary fund commitments, and liquid/semi-liquid investments; seeks long-term capital appreciation across multiple sectors, geographies, and vintage years.`,
-  2:`Global private equity fund-of-funds investing across primaries, secondaries, and direct co-investments; middle-market focus; managed by AlpInvest on Carlyle's platform; seeks long-term capital appreciation.`,
-  3:`Fund-of-funds investing in lending strategies across corporate, real asset, and alternative credit; seeks high current income and modest capital appreciation with a secondary objective of capital preservation; income-oriented with monthly distributions.`,
-  4:`Actively managed portfolio of private equity assets acquired primarily through secondary transactions; seeks long-term capital appreciation with vintage diversification and greater liquidity than traditional PE funds.`,
-  5:`Multi-lender, open-architecture private credit fund investing in senior secured direct lending and specialty credit; seeks current income and long-term capital appreciation via floating-rate, diversified credit exposure.`,
-  6:`Diversified private markets fund spanning private equity, real assets, and private debt; dynamically allocates across primaries, secondaries, and co-investments; seeks long-term capital appreciation via StepStone's global GP network.`,
-  7:`Venture capital and growth equity portfolio focused on the "innovation economy"; invests across primaries, secondaries, and direct investments diversified by stage, size, and geography; seeks long-term capital appreciation.`,
-  8:`Core private equity portfolio investing in primaries, secondaries, co-investments, and infrastructure funds globally via Pantheon's platform; seeks long-term capital appreciation.`,
-  9:`Private equity-focused fund investing principally in secondary PE funds, co-investments, and primary fund commitments; managed by Franklin Templeton and Lexington Partners; seeks long-term capital appreciation.`,
+  1:`Broad exposure to private equity via co-investments and secondary purchases.`,
+  2:`Global private equity fund-of-funds investing across primaries, secondaries, and direct co-investments; middle-market focus; managed by AlpInvest on Carlyle's platform.`,
+  3:`Fund-of-funds investing in lending strategies across corporate, real asset, and alternative credit.`,
+  4:`Actively managed portfolio of private equity assets acquired primarily through secondary transactions.`,
+  5:`Private credit fund investing in senior secured direct lending and specialty credit.`,
+  6:`Diversified private markets fund spanning private equity, real assets, and private debt.`,
+  7:`Venture capital and growth equity portfolio; invests across primaries, secondaries, and direct investments diversified by stage, size, and geography.`,
+  8:`Core private equity portfolio investing in primaries, secondaries, co-investments, and infrastructure funds globally.`,
+  9:`Private equity-focused fund investing principally in secondary PE funds, co-investments, and primary fund commitments; managed by Franklin Templeton and Lexington Partners.`,
   10:`Diversified private equity portfolio targeting capital appreciation over the medium and long term through direct co-investments and secondaries globally; leverages Hamilton Lane's broader private markets platform.`,
-  11:`Actively managed private equity portfolio investing in secondaries, co-investments, and primaries with a small-to-mid-market focus; also includes private equity and venture capital strategies; seeks long-term capital appreciation.`,
+  11:`Actively managed private equity portfolio investing in secondaries, co-investments, and primaries with a small-to-mid-market focus; also includes private equity and venture capital strategies.`,
 };
 // Page-title overrides by fund_id (the Fund Information panel still shows the
 // full SEC name). E.g. AMG Pantheon's title omits the LLC entity suffix.
@@ -460,8 +454,6 @@ function activatePage(page){
   const sec=document.getElementById("page-"+page);
   if(sec) sec.classList.add("active");
   document.getElementById("page-title").textContent=TITLES[page];
-  const fsel=document.getElementById("fund-select");
-  if(fsel) fsel.style.display=(page==="fund")?"":"none";
   try{ localStorage.setItem("sgg_page", page); }catch(e){}
   render(page);
 }
@@ -475,10 +467,41 @@ const MONTHS_LONG=["January","February","March","April","May","June","July",
   "August","September","October","November","December"];
 function fmtMonthYear(s){ if(s==null) return ""; const p=String(s).split("-");
   const m=parseInt(p[1],10); return (m>=1&&m<=12?MONTHS_LONG[m-1]+" ":"")+p[0]; }
+// Shortened, upper-case month + year, e.g. "2026-04-30" -> "APR 2026".
+const MONTHS_SHORT=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+function fmtMonShortYear(s){ if(s==null) return ""; const p=String(s).split("-");
+  const m=parseInt(p[1],10); return (m>=1&&m<=12?MONTHS_SHORT[m-1]+" ":"")+p[0]; }
+// "As of" tooltip text, e.g. "2026-04-30" -> "As of Apr 2026". Empty if no date.
+const MONTHS_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function asOfTitle(s){ if(s==null) return ""; const p=String(s).split("-");
+  const m=parseInt(p[1],10); return "As of "+(m>=1&&m<=12?MONTHS_ABBR[m-1]+" ":"")+p[0]; }
+// Shared styled tooltip for the Returns/Risks metric cells (replaces native
+// title= so we control the look: translucent gray, rounded, no border).
+const metricTip=document.createElement("div");
+metricTip.className="metric-tip";
+if(document.body) document.body.appendChild(metricTip);
+document.addEventListener("mouseover",e=>{
+  const el=e.target.closest?e.target.closest(".tip[data-tip]"):null;
+  if(!el||!el.dataset.tip) return;
+  metricTip.textContent=el.dataset.tip;
+  const r=el.getBoundingClientRect();
+  metricTip.style.left=(r.left+r.width/2)+"px";
+  metricTip.style.top=(r.top-4)+"px";
+  metricTip.classList.add("show");
+});
+document.addEventListener("mouseout",e=>{
+  const el=e.target.closest?e.target.closest(".tip[data-tip]"):null;
+  if(el) metricTip.classList.remove("show");
+});
+// Full date including the day, e.g. "2026-03-31" -> "March 31, 2026".
+function fmtMonthDayYear(s){ if(s==null) return ""; const p=String(s).split("-");
+  const m=parseInt(p[1],10), d=parseInt(p[2],10);
+  return (m>=1&&m<=12?MONTHS_LONG[m-1]+" ":"")+d+", "+p[0]; }
 function updateAsOf(page){
   const el=document.getElementById("asof");
   if(!el) return;
-  if(page==="portfolio" && store.asOf){ el.textContent="Data as of "+fmtMonthYear(store.asOf); el.style.display=""; }
+  if(page==="portfolio" && store.asOf){ el.textContent="Portfolio data as of "+fmtMonthDayYear(store.asOf); el.style.display=""; }
+  else if(page==="fund" && store.fundAsOf){ el.textContent="Fund data as of "+fmtMonthDayYear(store.fundAsOf); el.style.display=""; }
   else { el.style.display="none"; }
 }
 
@@ -502,6 +525,10 @@ async function renderHome(){
     ret.className="value";
     ret.style.color = lmpr==null ? "#666" : (lmpr>0?GREEN : (lmpr<0?NEG : "#000"));
     document.getElementById("kpi-nav").textContent=moneyM(kpi.current_total_sgg_nav);
+    const navAsof=document.getElementById("kpi-nav-asof");
+    if(navAsof) navAsof.textContent=kpi.current_total_sgg_nav_as_of?("(AS OF "+fmtMonShortYear(kpi.current_total_sgg_nav_as_of)+")"):"";
+    const retAsof=document.getElementById("kpi-return-asof");
+    if(retAsof) retAsof.textContent=kpi.last_month_portfolio_return_as_of?("(AS OF "+fmtMonShortYear(kpi.last_month_portfolio_return_as_of)+")"):"";
     if(!tri.benchmark_available){
       document.getElementById("bench-note").innerHTML=
         '<div class="note">Pitchbook benchmark sheet not present in the workbook — benchmark line and downside-capture are omitted. They will populate automatically once a <code>pitchbook_tri_index</code> sheet is added.</div>';
@@ -517,12 +544,17 @@ async function renderHome(){
       borderColor:s.benchmark?BENCH:fundColor(s.fund_id,i),
       borderDash:s.benchmark?[5,4]:[],
       borderWidth:s.benchmark?1.5:1.6,
-      pointRadius:0,pointHoverRadius:3,tension:.2,spanGaps:true,fill:false,
+      pointRadius:0,pointHoverRadius:3,tension:0,spanGaps:true,fill:false,
     }));
     const normOptions=lineOpts({legend:false});
     // Animate horizontal repositioning (lines sliding when the x-axis range
     // changes) but NOT vertical appear/disappear when a line is toggled.
     normOptions.animations={x:{duration:500,easing:"easeOutCubic"},y:{duration:0}};
+    // Tooltip: show each fund's color as a short horizontal line, not a box.
+    normOptions.plugins.tooltip.usePointStyle=true;
+    normOptions.plugins.tooltip.callbacks.labelPointStyle=()=>({pointStyle:"line",rotation:0});
+    // List funds in plotted order: highest y-value at the top, descending.
+    normOptions.plugins.tooltip.itemSort=(a,b)=>b.parsed.y-a.parsed.y;
     charts.norm=new Chart(document.getElementById("chart-home-norm"),{
       type:"line",
       data:{labels:tri.dates,datasets:normDs},
@@ -531,17 +563,32 @@ async function renderHome(){
     buildLegend("legend-norm", charts.norm, ()=>recomputeNorm(charts.norm));
     recomputeNorm(charts.norm);
 
-    // Last Monthly Return by Fund (uses all available data — not capped).
-    const lr=rm.metrics.filter(m=>m.last_monthly_return!=null)
-      .sort((a,b)=>b.last_monthly_return-a.last_monthly_return);
+    // Last Monthly Return by Fund — all bars share ONE common as-of month
+    // (the most recent month any fund has reported). Funds that haven't reported
+    // that month yet are shown greyed/pending so nothing is silently dropped or
+    // compared across mismatched months.
+    const asOf=rm.last_return_as_of;            // e.g. "2026-04-30" or null
+    const GREY="#c4ccd2";
+    const asOfLabel=asOf?fmtMonShortYear(asOf):null;   // e.g. "APR 2026"
+    const asOfEl=document.getElementById("lastret-asof");
+    if(asOfEl) asOfEl.textContent=asOfLabel?("(AS OF "+asOfLabel+")"):"";
+    // Reported funds first (sorted by return desc), then pending funds.
+    const reported=rm.metrics.filter(m=>m.common_month_return!=null)
+      .sort((a,b)=>b.common_month_return-a.common_month_return);
+    const pending=rm.metrics.filter(m=>m.common_month_return==null)
+      .sort((a,b)=>(a.fund_name||"").localeCompare(b.fund_name||""));
+    const lr=reported.concat(pending);
     charts.lastret=new Chart(document.getElementById("chart-lastret"),{
       type:"bar",
-      data:{labels:lr.map(m=>m.fund_name),datasets:[{label:"Last Monthly Return",
-        data:lr.map(m=>m.last_monthly_return*100),
-        backgroundColor:lr.map(m=>m.last_monthly_return>=0?GREEN:NEG)}]},
+      data:{labels:lr.map(m=>m.common_month_return==null?(m.fund_name+" — pending"):m.fund_name),
+        datasets:[{label:"Monthly Return",
+        data:lr.map(m=>m.common_month_return==null?null:m.common_month_return*100),
+        backgroundColor:lr.map(m=>m.common_month_return==null?GREY:(m.common_month_return>=0?GREEN:NEG))}]},
       options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:c=>" "+c.parsed.x.toFixed(2)+"%"}}},
-        scales:{x:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}},y:{grid:{display:false},ticks:{color:"#888"}}}}
+        tooltip:{displayColors:false,callbacks:{label:c=>{const m=lr[c.dataIndex];
+          return m.common_month_return==null?" No "+(asOfLabel||"")+" return reported yet":" "+c.parsed.x.toFixed(2)+"%";}}}},
+        scales:{x:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}},
+          y:{grid:{display:false},ticks:{color:ctx=>(lr[ctx.index]&&lr[ctx.index].common_month_return==null)?GREY:"#888"}}}}
     });
   }catch(e){ console.error(e); }
 }
@@ -633,13 +680,17 @@ async function renderPortfolio(){
         datasets:[{data:p.allocation.map(a=>a.sgg_nav),
           backgroundColor:p.allocation.map((a,i)=>fundColor(a.fund_id,i)),borderColor:"#ffffff",borderWidth:1}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:11},color:"#444",padding:6}},
-        tooltip:{callbacks:{label:c=>` ${c.label}: ${money(c.parsed)} (${p.allocation[c.dataIndex].pct.toFixed(1)}%)`}}}}
+        tooltip:{displayColors:false,callbacks:{
+          title:items=>items.length?items[0].label:"",
+          label:c=>` ${money(c.parsed)} (${p.allocation[c.dataIndex].pct.toFixed(1)}%)`}}}}
     });
+    const totnavOpts=lineOpts({legend:false,dollar:true});
+    totnavOpts.plugins.tooltip.displayColors=false;
     charts.totnav=new Chart(document.getElementById("chart-totnav"),{
       type:"line",
       data:{labels:p.total_nav.dates,datasets:[{label:"Total SGG NAV",data:p.total_nav.values,
-        borderColor:"#1e2d3d",borderWidth:2,fill:false,tension:.2,pointRadius:2}]},
-      options:lineOpts({legend:false,dollar:true})
+        borderColor:"#1e2d3d",borderWidth:2,fill:false,tension:0,pointRadius:2}]},
+      options:totnavOpts
     });
 
     // Combo chart: Portfolio TRI (line, left axis) + Monthly Return (bars, right
@@ -660,7 +711,7 @@ async function renderPortfolio(){
             borderColor:"#1e2d3d",borderWidth:0,barPercentage:0.5,categoryPercentage:0.8,order:2},
           {type:"line",label:"Total Return",data:p.tri.values,
             yAxisID:"y",borderColor:"#738C45",backgroundColor:"transparent",borderWidth:2,
-            pointRadius:3,pointHoverRadius:5,pointBackgroundColor:"#738C45",fill:false,tension:0.3,order:1}
+            pointRadius:3,pointHoverRadius:5,pointBackgroundColor:"#738C45",fill:false,tension:0,order:1}
         ]
       },
       options:{
@@ -729,14 +780,14 @@ async function renderRisk(){
   try{
     const [risk,ret]=await Promise.all([getJSON("/api/risk_metrics"),getJSON("/api/return_metrics")]);
     const rb=document.querySelector("#tbl-risk tbody");
-    rb.innerHTML=risk.metrics.map((m,i)=>`<tr>
+    rb.innerHTML=risk.metrics.map((m,i)=>{const ao=asOfTitle(m.as_of);return `<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      <td class="num">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
-      <td class="num">${m.time_to_trough??"—"}</td>
-      <td class="num">${m.recovery_time??"—"}</td>
-      <td class="num">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
-      <td class="num">${typeof m.downside_capture_ratio==="number"?m.downside_capture_ratio.toFixed(1)+"%":"—"}</td>
-    </tr>`).join("");
+      <td class="num tip" data-tip="${ao}">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
+      <td class="num tip" data-tip="${ao}">${m.time_to_trough??"—"}</td>
+      <td class="num tip" data-tip="${ao}">${m.recovery_time??"—"}</td>
+      <td class="num tip" data-tip="${ao}">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
+      <td class="num tip" data-tip="${ao}">${typeof m.downside_capture_ratio==="number"?m.downside_capture_ratio.toFixed(1)+"%":"—"}</td>
+    </tr>`;}).join("");
     document.querySelector("#tbl-risk-summary tbody").innerHTML=summaryRows(risk.metrics, [
         {get:m=>m.max_drawdown,            fmt:v=>pct(v)},
         {get:m=>m.time_to_trough,          fmt:fmtMonthsStat},
@@ -745,11 +796,11 @@ async function renderRisk(){
         {get:m=>m.downside_capture_ratio,  fmt:v=>v.toFixed(1)+"%"},
       ]);
     const tb=document.querySelector("#tbl-ret tbody");
-    tb.innerHTML=ret.metrics.map((m,i)=>`<tr>
+    tb.innerHTML=ret.metrics.map((m,i)=>{const ao=asOfTitle(m.as_of);return `<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      <td class="num">${pct(m.ytd_return)}</td><td class="num">${pct(m.trailing_1y)}</td><td class="num">${pct(m.trailing_3y)}</td>
-      <td class="num">${pct(m.annualized_since_inception)}</td><td class="num">${pct(m.total_return_since_inception)}</td>
-    </tr>`).join("");
+      <td class="num tip" data-tip="${ao}">${pct(m.ytd_return)}</td><td class="num tip" data-tip="${ao}">${pct(m.trailing_1y)}</td><td class="num tip" data-tip="${ao}">${pct(m.trailing_3y)}</td>
+      <td class="num tip" data-tip="${ao}">${pct(m.annualized_since_inception)}</td><td class="num tip" data-tip="${ao}">${pct(m.total_return_since_inception)}</td>
+    </tr>`;}).join("");
     document.querySelector("#tbl-ret-summary tbody").innerHTML=summaryRows(ret.metrics, [
         {get:m=>m.ytd_return,                  fmt:v=>pct(v)},
         {get:m=>m.trailing_1y,                 fmt:v=>pct(v)},
@@ -782,10 +833,15 @@ async function renderFund(){
 async function loadFund(fid){
   const f=store.fundsById[fid]||{}, n=store.navById[fid]||{}, r=store.retById[fid]||{};
   document.getElementById("fund-name").textContent=FUND_TITLE_OVERRIDE[fid]||f.sec_name||f.fund_name||"—";
-  updateFundLogo(fid);
+  store.fundAsOf = n.month_end || null;
+  updateAsOf("fund");
   updateFundMetrics(fid);
   updateFundInfo(f);
   document.getElementById("fk-nav").textContent=n.nav_per_share!=null?"$"+n.nav_per_share.toFixed(2):"—";
+  // Only show the card's as-of when it differs from the top-right "Fund data as
+  // of" label (store.fundAsOf), to avoid showing the same date twice.
+  const fkNavAsof=document.getElementById("fk-nav-asof");
+  if(fkNavAsof) fkNavAsof.textContent=(n.nav_per_share!=null && n.month_end && n.month_end!==store.fundAsOf)?("(AS OF "+fmtMonShortYear(n.month_end)+")"):"";
   const cg=document.getElementById("fk-cagr");
   cg.textContent=pct(r.annualized_since_inception); cg.className="value sm";
   document.getElementById("fk-strat").textContent=f.fund_type||"—";
@@ -816,9 +872,9 @@ async function loadFund(fid){
   // Same legend mechanics as Home: every series defaults to SELECTED (shown);
   // click a legend item to hide it, and the x-axis re-fits to what's visible.
   const ds=[{label:t.fund.fund_name,data:fundData,borderColor:fundColor(Number(fid),0),
-    hidden:false,borderWidth:2,fill:false,tension:.2,pointRadius:0,spanGaps:true}];
+    hidden:false,borderWidth:2,fill:false,tension:0,pointRadius:0,spanGaps:true}];
   if(benchData){ds.push({label:"Pitchbook Index",data:benchData,borderColor:BENCH,
-    hidden:false,borderDash:[5,4],borderWidth:1.5,fill:false,tension:.2,pointRadius:0,spanGaps:true});}
+    hidden:false,borderDash:[5,4],borderWidth:1.5,fill:false,tension:0,pointRadius:0,spanGaps:true});}
   if(charts.fund) charts.fund.destroy();
   charts.fund=new Chart(document.getElementById("chart-fund"),{
     type:"line",data:{labels:t.dates,datasets:ds},options:lineOpts({legend:false})});
@@ -827,6 +883,38 @@ async function loadFund(fid){
   charts.fund.update();
 }
 
+/* ---------- Normalized Total Returns fullscreen modal ---------- */
+(function(){
+  const modal=document.getElementById("norm-modal");
+  const openBtn=document.getElementById("norm-expand");
+  const closeBtn=document.getElementById("norm-modal-close");
+  if(!modal||!openBtn) return;
+  function openModal(){
+    if(!charts.norm) return;
+    modal.style.display="block";
+    // Reuse the home chart's data: clone datasets (own data + hidden state),
+    // sharing the read-only _raw arrays so nothing on the home chart mutates.
+    const data={labels:charts.norm.data.labels,
+      datasets:charts.norm.data.datasets.map(d=>Object.assign({},d,{data:(d._raw||d.data||[]).slice()}))};
+    const opts=lineOpts({legend:false});
+    opts.plugins.tooltip.usePointStyle=true;
+    opts.plugins.tooltip.callbacks.labelPointStyle=()=>({pointStyle:"line",rotation:0});
+    opts.plugins.tooltip.itemSort=(a,b)=>b.parsed.y-a.parsed.y;
+    if(charts.normModal) charts.normModal.destroy();
+    charts.normModal=new Chart(document.getElementById("chart-norm-modal"),{type:"line",data:data,options:opts});
+    buildLegend("legend-norm-modal", charts.normModal, ()=>recomputeNorm(charts.normModal));
+    recomputeNorm(charts.normModal);
+  }
+  function closeModal(){
+    modal.style.display="none";
+    if(charts.normModal){ charts.normModal.destroy(); charts.normModal=null; }
+  }
+  openBtn.addEventListener("click",openModal);
+  if(closeBtn) closeBtn.addEventListener("click",closeModal);
+  modal.addEventListener("click",e=>{ if(e.target===modal) closeModal(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape" && modal.style.display!=="none") closeModal(); });
+})();
+
 /* ---------- init ---------- */
 async function init(){
   try{
@@ -834,12 +922,6 @@ async function init(){
     buildColorMap(funds.funds);
     store.fundsList=funds.funds;
   }catch(e){ console.error(e); }
-  // Fetch fund logos; once loaded, refresh whatever fund is currently selected
-  // (handles the race between this fetch and the initial fund load).
-  fetch("/api/logos")
-    .then(r=>r.json())
-    .then(data=>{ logoMap=data; const sel=document.getElementById("fund-select"); updateFundLogo(sel?sel.value:null); })
-    .catch(e=>console.error(e));
   let saved="home";
   try{ saved=localStorage.getItem("sgg_page")||"home"; }catch(e){}
   activatePage(saved);
