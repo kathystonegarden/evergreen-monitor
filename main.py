@@ -19,10 +19,24 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-EXCEL_PATH = os.environ.get("EXCEL_PATH", "data/06_08_26_Evergreen_Database_v10.xlsx")
+EXCEL_PATH = os.environ.get("EXCEL_PATH", "data/06_10_26_Evergreen_Database_v11.xlsx")
 PERF_SHEET = "fund_performance"
 META_SHEET = "fund_metadata"
-PB_SHEET = "pitchbook_tri_index"
+# v11 renamed the benchmark sheet from "pitchbook_tri_index" -> "pitchbook_index"
+# (the column inside is still "pitchbook_index"). PB_SHEET drives the single
+# benchmark used for downside-capture (Fund Details + risk metrics).
+PB_SHEET = "pitchbook_index"
+
+# All benchmark indices overlaid on the Normalized Total Returns chart. Each is
+# loaded, collapsed to month-end (daily series get resampled), and normalized to
+# base 100 on the front end. `key` drives the line color; `label` is the legend
+# text. The loader still falls back to the lone non-date column if `col` is ever
+# missing, so a future header change won't break the line.
+BENCHMARKS = [
+    {"key": "pitchbook",    "sheet": "pitchbook_index",    "col": "pitchbook_index",    "label": "Pitchbook Morningstar Evergreen"},
+    {"key": "stepstone_pm", "sheet": "stepstone_pm_index", "col": "stepstone_pm_index", "label": "StepStone Private Markets"},
+    {"key": "sp500",        "sheet": "sp500_index",        "col": "sp500_index",        "label": "S&P 500"},
+]
 
 # Original purchase amounts by fund_id. Used as the fallback beginning-of-month
 # NAV for a fund's first held month, when there is no prior-month sgg_nav.
@@ -97,6 +111,48 @@ def load_benchmark():
         return pb[["month_end", "pitchbook_index"]].sort_values("month_end")
     except Exception:
         return None
+
+
+def _load_index(sheet, col):
+    """Load a benchmark index sheet as DataFrame[month_end, value], collapsed to
+    one row per calendar month (last observation) and dated to month-end so daily
+    series (e.g. StepStone) align exactly to the funds' monthly grid. Returns None
+    if the sheet/columns are absent or empty."""
+    try:
+        xl = pd.ExcelFile(EXCEL_PATH, engine="openpyxl")
+        if sheet not in xl.sheet_names:
+            return None
+        df = xl.parse(sheet)
+        if "month_end" not in df.columns:
+            return None
+        if col not in df.columns:
+            # Fall back to the only non-date column (guards the misspelled header).
+            others = [c for c in df.columns if c != "month_end"]
+            if not others:
+                return None
+            col = others[0]
+        df["month_end"] = pd.to_datetime(df["month_end"], errors="coerce")
+        df = df[df["month_end"].notna() & df[col].notna()]
+        if df.empty:
+            return None
+        per = df.sort_values("month_end").groupby(df["month_end"].dt.to_period("M")).last()
+        per.index = per.index.to_timestamp(how="end").normalize()
+        out = per[[col]].reset_index()
+        out.columns = ["month_end", "value"]
+        return out.sort_values("month_end")
+    except Exception:
+        return None
+
+
+def load_benchmarks():
+    """Return [{key,label,df}] for every configured benchmark present in the
+    workbook (df = DataFrame[month_end, value]). Empty list if none present."""
+    out = []
+    for b in BENCHMARKS:
+        df = _load_index(b["sheet"], b["col"])
+        if df is not None and len(df) >= 1:
+            out.append({"key": b["key"], "label": b["label"], "df": df})
+    return out
 
 
 # ──────────────────────────────────────────────────────────── helpers ──
@@ -277,6 +333,95 @@ def downside_capture(g, bret):
     return round(f_avg / b_avg * 100.0, 1)
 
 
+def _all_funds_cutoff(perf):
+    """Most recent month_end where EVERY fund reports a monthly_return.
+
+    This is the common as-of endpoint for the Risk/Return comparison tables, so
+    every fund's metrics are measured to the exact same month (apples-to-apples).
+    Auto-advances as lagging funds post. Falls back to the latest reported month
+    if no single month has all funds (e.g. a permanently-redeemed fund)."""
+    rep = perf[perf["monthly_return"].notna()]
+    if rep.empty:
+        return None
+    total = perf["fund_id"].nunique()
+    cnt = rep.groupby("month_end")["fund_id"].nunique()
+    full = cnt[cnt >= total]
+    if len(full):
+        return pd.Timestamp(full.index.max())
+    return pd.Timestamp(rep["month_end"].max())
+
+
+def _index_series(df, cutoff=None):
+    """Build {dates, returns, tri, inception} for a benchmark index df
+    (month_end, value), optionally truncated to <= cutoff. Mirrors fund_series so
+    the same metric helpers (drawdown, std, trailing, cagr) apply unchanged."""
+    d = df.sort_values("month_end")
+    if cutoff is not None:
+        d = d[d["month_end"] <= cutoff]
+    d = d.reset_index(drop=True)
+    if len(d) < 1:
+        return None
+    vals = [float(v) for v in d["value"].tolist()]
+    dates = list(d["month_end"])
+    base = vals[0]
+    if not base:
+        return None
+    tri = [v / base * 100.0 for v in vals]
+    returns = [None] + [vals[i] / vals[i - 1] - 1.0 for i in range(1, len(vals))]
+    return {"dates": dates, "returns": returns, "tri": tri, "inception": dates[0]}
+
+
+def _downside_capture_map(ret_map, bret):
+    """Downside capture from a month->return map against the benchmark map `bret`.
+    Pitchbook vs Pitchbook returns exactly 100.0. 'n/a' if no benchmark-down months."""
+    down = [(ret_map[m], bret[m]) for m in ret_map if m in bret and bret[m] < 0]
+    if not down:
+        return "n/a"
+    f = sum(d[0] for d in down) / len(down)
+    b = sum(d[1] for d in down) / len(down)
+    return round(f / b * 100.0, 1)
+
+
+def _index_metrics(cutoff, bret):
+    """Risk + return metrics for each benchmark index, truncated to <= cutoff,
+    using the SAME methodology as the fund tables. YTD uses the cutoff's calendar
+    year (so an index with no data that year shows a dash). Each dict carries both
+    risk and return fields; the two endpoints render the relevant subset."""
+    ytd_year = cutoff.year if cutoff is not None else None
+    out = []
+    for bd in load_benchmarks():
+        s = _index_series(bd["df"], cutoff)
+        if s is None:
+            out.append({"key": bd["key"], "fund_name": bd["label"]})
+            continue
+        dd = max_drawdown(s["dates"], s["tri"])
+        rets_all = [r for r in s["returns"] if r is not None]
+        std = _num(np.std(rets_all, ddof=1) * math.sqrt(12)) if len(rets_all) >= 2 else None
+        rd = [(pd.Timestamp(d), r) for d, r in zip(s["dates"], s["returns"]) if r is not None]
+        rets = [r for _, r in rd]
+        tri = [v for v in s["tri"] if v is not None]
+        latest = s["dates"][-1]
+        msi = _months_between(s["inception"], latest)
+        tri_final = tri[-1] if tri else None
+        total_ret = _num(tri_final / 100.0 - 1.0) if tri_final else None
+        cagr = _num((tri_final / 100.0) ** (12.0 / msi) - 1.0) if (tri_final and msi > 0) else None
+        trailing_1y = _num(_product(rets[-12:])) if len(rets) >= 12 else None
+        trailing_3y = _num(_product(rets[-36:])) if len(rets) >= 36 else None
+        yr = ytd_year if ytd_year is not None else latest.year
+        ytd_rets = [r for d, r in rd if d.year == yr]
+        ytd = _num(_product(ytd_rets)) if ytd_rets else None
+        dcr = _downside_capture_map({pd.Timestamp(d): r for d, r in rd}, bret)
+        out.append({
+            "key": bd["key"], "fund_name": bd["label"],
+            "max_drawdown": dd["max_drawdown"], "time_to_trough": dd["time_to_trough"],
+            "recovery_time": dd["recovery_time"], "annualized_std_dev": std,
+            "downside_capture_ratio": dcr,
+            "ytd_return": ytd, "trailing_1y": trailing_1y, "trailing_3y": trailing_3y,
+            "annualized_since_inception": cagr, "total_return_since_inception": total_ret,
+        })
+    return out
+
+
 # ─────────────────────────────────────────────────────────────── endpoints ──
 @app.get("/api/funds")
 def get_funds():
@@ -376,15 +521,15 @@ def _all_fund_series(perf, meta):
 def get_tri():
     perf = load_perf()
     meta = load_meta()
-    bench = load_benchmark()
+    benches = load_benchmarks()
     series = _all_fund_series(perf, meta)
 
-    # Master date axis = union of all fund dates (+ benchmark).
+    # Master date axis = union of all fund dates (+ every benchmark).
     all_dates = set()
     for s in series.values():
         all_dates.update(s["dates"])
-    if bench is not None:
-        all_dates.update(pd.Timestamp(d) for d in bench["month_end"])
+    for bd in benches:
+        all_dates.update(pd.Timestamp(d) for d in bd["df"]["month_end"])
     dates = sorted(all_dates)
     idx = {d: i for i, d in enumerate(dates)}
 
@@ -395,19 +540,26 @@ def get_tri():
             data[idx[d]] = _num(v)
         out_series.append({"fund_id": fid, "fund_name": s["name"], "data": data, "benchmark": False})
 
-    if bench is not None and len(bench) >= 1:
-        base = bench["pitchbook_index"].iloc[0]
+    # One dashed line per benchmark, normalized to base 100 at its own first point
+    # (the front end rebases again to the funds' common start). bench_key drives
+    # the line color in the UI.
+    for bd in benches:
+        df = bd["df"]
+        base = df["value"].iloc[0]
         data = [None] * len(dates)
-        for _, r in bench.iterrows():
-            data[idx[pd.Timestamp(r["month_end"])]] = _num(r["pitchbook_index"] / base * 100.0)
+        if base and base != 0:
+            for _, r in df.iterrows():
+                data[idx[pd.Timestamp(r["month_end"])]] = _num(r["value"] / base * 100.0)
         out_series.append(
-            {"fund_id": None, "fund_name": "Pitchbook Index", "data": data, "benchmark": True}
+            {"fund_id": None, "fund_name": bd["label"], "data": data,
+             "benchmark": True, "bench_key": bd["key"]}
         )
 
     return {
         "dates": [_datestr(d) for d in dates],
         "series": out_series,
-        "benchmark_available": bench is not None,
+        "benchmark_available": len(benches) > 0,
+        "benchmark_count": len(benches),
     }
 
 
@@ -415,40 +567,47 @@ def get_tri():
 def get_tri_fund(fund_id: int):
     perf = load_perf()
     meta = load_meta()
-    bench = load_benchmark()
+    benches = load_benchmarks()
     g = perf[perf["fund_id"] == fund_id]
     if g.empty:
         return JSONResponse(status_code=404, content={"error": f"fund {fund_id} not found"})
     name = dict(zip(meta["fund_id"], meta["fund_name"])).get(fund_id)
     s = fund_series(g)
     if s is None:
-        return {"fund_id": fund_id, "fund_name": name, "dates": [], "fund": None, "benchmark": None}
+        return {"fund_id": fund_id, "fund_name": name, "dates": [], "series": [],
+                "benchmark_available": len(benches) > 0}
 
-    dates = list(s["dates"])
-    if bench is not None:
-        all_d = sorted(set(dates) | set(pd.Timestamp(d) for d in bench["month_end"]))
-    else:
-        all_d = dates
+    # Master axis = fund dates + every benchmark's months. The front end nulls
+    # all series before the fund's inception and rebases to 100 there, so the
+    # wide benchmark history doesn't widen the visible range.
+    all_set = set(s["dates"])
+    for bd in benches:
+        all_set |= set(pd.Timestamp(d) for d in bd["df"]["month_end"])
+    all_d = sorted(all_set)
     idx = {d: i for i, d in enumerate(all_d)}
 
+    series = []
     fund_data = [None] * len(all_d)
     for d, v in zip(s["dates"], s["tri"]):
         fund_data[idx[d]] = _num(v)
+    series.append({"fund_id": fund_id, "fund_name": name, "data": fund_data, "benchmark": False})
 
-    bench_data = None
-    if bench is not None and len(bench) >= 1:
-        base = bench["pitchbook_index"].iloc[0]
-        bench_data = [None] * len(all_d)
-        for _, r in bench.iterrows():
-            bench_data[idx[pd.Timestamp(r["month_end"])]] = _num(r["pitchbook_index"] / base * 100.0)
+    for bd in benches:
+        df = bd["df"]
+        base = df["value"].iloc[0]
+        data = [None] * len(all_d)
+        if base and base != 0:
+            for _, r in df.iterrows():
+                data[idx[pd.Timestamp(r["month_end"])]] = _num(r["value"] / base * 100.0)
+        series.append({"fund_id": None, "fund_name": bd["label"], "data": data,
+                       "benchmark": True, "bench_key": bd["key"]})
 
     return {
         "fund_id": fund_id,
         "fund_name": name,
         "dates": [_datestr(d) for d in all_d],
-        "fund": {"fund_name": name, "data": fund_data},
-        "benchmark": ({"fund_name": "Pitchbook Index", "data": bench_data} if bench_data else None),
-        "benchmark_available": bench is not None,
+        "series": series,
+        "benchmark_available": len(benches) > 0,
     }
 
 
@@ -607,17 +766,60 @@ def get_portfolio():
     }
 
 
+@app.get("/api/portfolio_tri")
+def get_portfolio_tri():
+    """Portfolio TRI (base 100) plus each benchmark's TRI (base 100) on a shared
+    monthly axis. The front end rebases everything to 100 at the portfolio's first
+    month and toggles series, exactly like the home Normalized Total Returns chart."""
+    perf = load_perf()
+    meta = load_meta()
+    p = _portfolio(perf, meta)
+    benches = load_benchmarks()
+
+    pdates = p["ptri_dates"]
+    pvals = p["ptri"]
+    all_set = set(pd.Timestamp(d) for d in pdates)
+    for bd in benches:
+        all_set |= set(pd.Timestamp(d) for d in bd["df"]["month_end"])
+    all_d = sorted(all_set)
+    idx = {d: i for i, d in enumerate(all_d)}
+
+    series = []
+    pdata = [None] * len(all_d)
+    for d, v in zip(pdates, pvals):
+        pdata[idx[pd.Timestamp(d)]] = _num(v)
+    series.append({"fund_id": None, "fund_name": "SGG Portfolio", "data": pdata, "benchmark": False})
+
+    for bd in benches:
+        df = bd["df"]
+        base = df["value"].iloc[0]
+        data = [None] * len(all_d)
+        if base and base != 0:
+            for _, r in df.iterrows():
+                data[idx[pd.Timestamp(r["month_end"])]] = _num(r["value"] / base * 100.0)
+        series.append({"fund_id": None, "fund_name": bd["label"], "data": data,
+                       "benchmark": True, "bench_key": bd["key"]})
+
+    return {"dates": [_datestr(d) for d in all_d], "series": series}
+
+
 @app.get("/api/risk_metrics")
-def get_risk_metrics():
+def get_risk_metrics(common: bool = False):
     perf = load_perf()
     meta = load_meta()
     bench = load_benchmark()
     name = dict(zip(meta["fund_id"], meta["fund_name"]))
     bret = benchmark_returns(bench)
 
+    # When common=True (Risk/Return comparison tables) every fund is truncated to
+    # the last month all funds report, so all metrics share one as-of endpoint.
+    cutoff = _all_funds_cutoff(perf) if common else None
+
     rows = []
     for fid, g in perf.groupby("fund_id"):
         fid = int(fid)
+        if cutoff is not None:
+            g = g[g["month_end"] <= cutoff]
         s = fund_series(g)
         if s is None:
             continue
@@ -658,14 +860,26 @@ def get_risk_metrics():
             }
         )
     rows.sort(key=lambda x: (x["fund_name"] or "").lower())
-    return {"count": len(rows), "benchmark_available": bench is not None, "metrics": rows}
+    return {
+        "count": len(rows),
+        "benchmark_available": bench is not None,
+        "as_of": _datestr(cutoff) if cutoff is not None else None,
+        "metrics": rows,
+        "index_metrics": _index_metrics(cutoff, bret),
+    }
 
 
 @app.get("/api/return_metrics")
-def get_return_metrics():
+def get_return_metrics(common: bool = False):
     perf = load_perf()
     meta = load_meta()
     name = dict(zip(meta["fund_id"], meta["fund_name"]))
+
+    # When common=True (Risk/Return comparison tables) every fund is truncated to
+    # the last month all funds report, so all metrics share one as-of endpoint.
+    # The home-page "Last Monthly Return by Fund" bars call WITHOUT common, so the
+    # common_month_return / last_return_as_of logic below is unaffected for them.
+    cutoff = _all_funds_cutoff(perf) if common else None
 
     # Common as-of month for the "Last Monthly Return by Fund" comparison.
     # = the most recent month_end that has at least one reported monthly_return
@@ -678,6 +892,8 @@ def get_return_metrics():
     rows = []
     for fid, g in perf.groupby("fund_id"):
         fid = int(fid)
+        if cutoff is not None:
+            g = g[g["month_end"] <= cutoff]
         s = fund_series(g)
         if s is None:
             continue
@@ -727,11 +943,28 @@ def get_return_metrics():
                 "as_of": _datestr(latest),
             }
         )
+    # Benchmark index monthly returns for the common as-of month (used by the
+    # home "Last Monthly Return by Fund" chart). Null when an index has no data
+    # for that month (e.g. the Pitchbook/Morningstar index publishes on a lag).
+    bench_returns = []
+    if common_as_of is not None:
+        prev_m = pd.Timestamp(common_as_of) - pd.offsets.MonthEnd(1)
+        for bd in load_benchmarks():
+            m = {pd.Timestamp(r["month_end"]): float(r["value"]) for _, r in bd["df"].iterrows()}
+            cur = m.get(pd.Timestamp(common_as_of))
+            pv = m.get(prev_m)
+            mr = _num(cur / pv - 1.0) if (cur is not None and pv) else None
+            bench_returns.append({"key": bd["key"], "label": bd["label"], "monthly_return": mr})
+
     rows.sort(key=lambda x: (x["fund_name"] or "").lower())
+    bret = benchmark_returns(load_benchmark())
     return {
         "count": len(rows),
+        "as_of": _datestr(cutoff) if cutoff is not None else None,
         "last_return_as_of": _datestr(common_as_of) if common_as_of is not None else None,
+        "benchmark_returns": bench_returns,
         "metrics": rows,
+        "index_metrics": _index_metrics(cutoff, bret),
     }
 
 
@@ -747,12 +980,41 @@ def get_kpis():
     last_port_as_of = _datestr(p["port_dates"][-1]) if p["port_dates"] else None
     current_total_as_of = _datestr(p["tot_dates"][-1]) if p["tot_dates"] else None
 
+    # YTD portfolio return = compounded portfolio monthly returns in the latest
+    # portfolio month's calendar year, as of that month.
+    ytd_port = None
+    ytd_port_as_of = None
+    if p["port_dates"]:
+        last_d = pd.Timestamp(p["port_dates"][-1])
+        yr_rets = [r for d, r in zip(p["port_dates"], p["port_rets"])
+                   if pd.Timestamp(d).year == last_d.year]
+        if yr_rets:
+            ytd_port = _num(_product(yr_rets))
+            ytd_port_as_of = _datestr(last_d)
+
+    # Last-available-month return of the Pitchbook benchmark (most recent
+    # month-over-month change in the pitchbook index), with its as-of month.
+    bench = load_benchmark()
+    bench_ret = None
+    bench_ret_as_of = None
+    if bench is not None and len(bench) >= 2:
+        b = bench.sort_values("month_end").reset_index(drop=True)
+        prev = b["pitchbook_index"].iloc[-2]
+        cur = b["pitchbook_index"].iloc[-1]
+        if prev and prev != 0:
+            bench_ret = _num(cur / prev - 1.0)
+            bench_ret_as_of = _datestr(b["month_end"].iloc[-1])
+
     return {
         "holdings_tracked": holdings,
         "last_month_portfolio_return": last_port,
         "last_month_portfolio_return_as_of": last_port_as_of,
         "current_total_sgg_nav": current_total,
         "current_total_sgg_nav_as_of": current_total_as_of,
+        "last_month_benchmark_return": bench_ret,
+        "last_month_benchmark_return_as_of": bench_ret_as_of,
+        "ytd_portfolio_return": ytd_port,
+        "ytd_portfolio_return_as_of": ytd_port_as_of,
     }
 
 
@@ -777,3 +1039,4 @@ def index():
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# (v11 benchmark wiring: pitchbook + stepstone_pm + sp500)

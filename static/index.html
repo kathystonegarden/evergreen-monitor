@@ -51,7 +51,8 @@
   .grid{display:grid;gap:16px;}
 
   /* KPI */
-  .kpi{background:var(--card);border:1px solid var(--card-border);padding:16px 18px;}
+  .kpi{background:var(--card);border:1px solid var(--card-border);padding:16px 18px;
+    display:flex;flex-direction:column;}
   .fund-name{font-size:30px;font-weight:700;color:var(--text);letter-spacing:.2px;margin-bottom:16px;}
   /* Fund Information: white box outside, plain table inside — no table border,
      no zebra striping (only the light inline row dividers remain). */
@@ -61,14 +62,13 @@
   /* Fixed-layout risk/return tables: let headers wrap, summary tables have no top border. */
   #tbl-risk thead th, #tbl-ret thead th{white-space:normal;}
   #fd-risk-table thead th, #fd-ret-table thead th{white-space:normal;}
-  #tbl-risk-summary, #tbl-ret-summary{border-top:1px solid var(--card-border);}
   .footnote{font-size:11px;color:var(--muted);margin-top:16px;}
   .footnote sup{font-size:9px;}
   .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
-  .kpi .value{font-size:24px;font-weight:700;margin-top:8px;color:var(--text);font-variant-numeric:tabular-nums;}
+  .kpi .value{font-size:24px;font-weight:700;margin-top:auto;color:var(--text);font-variant-numeric:tabular-nums;}
   .kpi .value.sm{font-size:18px;}
 
-  .kpi-row{grid-template-columns:repeat(4,1fr);}
+  .kpi-row{grid-template-columns:repeat(5,1fr);}
 
   .chart-wrap{position:relative;width:100%;}
   canvas{width:100%!important;}
@@ -120,10 +120,10 @@
     <div class="brand"><div class="b1">Stone Garden Group</div><div class="b2">Evergreen Monitor</div></div>
     <button data-page="home" class="active">Home</button>
     <button data-page="portfolio">SGG Portfolio</button>
-    <div class="navhead">Fund Comparisons</div>
+    <div class="navhead">Risk and Return Analysis</div>
     <button data-page="returns" class="sub">Returns</button>
     <button data-page="risk" class="sub">Risks</button>
-    <button data-page="distributions" class="sub">Distributions and Redemptions</button>
+    <button data-page="distributions">Distributions and Redemptions</button>
     <button data-page="fund">Fund Details</button>
   </nav>
 
@@ -139,8 +139,9 @@
         <div class="grid kpi-row" style="margin-bottom:16px;">
           <div class="kpi"><div class="label">Current Total SGG NAV <span id="kpi-nav-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-nav">—</div></div>
           <div class="kpi"><div class="label">Last Month Portfolio Return <span id="kpi-return-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-return">—</div></div>
+          <div class="kpi"><div class="label">YTD Portfolio Return <span id="kpi-ytd-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-ytd">—</div></div>
           <div class="kpi"><div class="label">Holdings Tracked</div><div class="value" id="kpi-holdings">—</div></div>
-          <div class="kpi"><div class="label">Benchmarks</div><div class="value" id="kpi-benchmarks">1</div></div>
+          <div class="kpi"><div class="label">Last Month Benchmark Return <span id="kpi-bench-asof" style="font-weight:400;color:#888;"></span></div><div class="value" id="kpi-bench-return">—</div></div>
         </div>
         <div class="grid row-2">
           <div class="card" style="position:relative;">
@@ -154,20 +155,26 @@
           <div class="card">
             <h2>Last Monthly Return by Fund <span id="lastret-asof" style="font-weight:400;color:#888;font-size:12px;"></span></h2>
             <div class="chart-wrap"><canvas id="chart-lastret" height="360"></canvas></div>
+            <div class="legend" id="legend-lastret"></div>
           </div>
         </div>
       </section>
 
-      <!-- PAGE 2: PORTFOLIO -->
+      <!-- PAGE 2: PORTFOLIO (2x2) -->
       <section class="page" id="page-portfolio">
-        <div style="background:white; border:1px solid #d0d7de; padding:20px; margin-bottom:16px;">
-          <div style="font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#444; margin-bottom:16px;">Portfolio Performance</div>
-          <div style="position:relative; height:320px;"><canvas id="portfolio-combo-chart"></canvas></div>
-          <div class="legend" id="legend-combo"></div>
-        </div>
         <div class="grid row-2">
-          <div class="card"><h2>Current SGG NAV Allocation</h2><div class="chart-wrap"><canvas id="chart-pie" height="300"></canvas></div></div>
-          <div class="card"><h2>Total SGG NAV Over Time</h2><div class="chart-wrap"><canvas id="chart-totnav" height="300"></canvas></div></div>
+          <div class="card" style="position:relative;">
+            <h2>Total Portfolio Return</h2>
+            <div class="chart-wrap" style="height:300px;"><canvas id="chart-port-tri"></canvas></div>
+            <div class="legend" id="legend-port-tri"></div>
+          </div>
+          <div class="card">
+            <h2>Portfolio Performance</h2>
+            <div style="position:relative; height:300px;"><canvas id="portfolio-combo-chart"></canvas></div>
+            <div class="legend" id="legend-combo"></div>
+          </div>
+          <div class="card"><h2>Current SGG NAV Allocation</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-pie"></canvas></div></div>
+          <div class="card"><h2>Total SGG NAV Over Time</h2><div class="chart-wrap" style="height:300px;"><canvas id="chart-totnav"></canvas></div></div>
         </div>
       </section>
 
@@ -183,7 +190,8 @@
               <th>Fund</th><th class="num">Max Drawdown</th><th class="num">Time to Trough (months)</th>
               <th class="num">Recovery (months)</th><th class="num">Standard Deviation (ann.)</th><th class="num">Downside Capture<sup>1</sup></th>
             </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
-            <table id="tbl-risk-summary" style="table-layout:fixed;margin-top:28px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#888;margin:22px 0 8px;">Benchmarks</div>
+            <table id="tbl-risk-idx" style="table-layout:fixed;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
               <tbody></tbody>
             </table>
@@ -205,7 +213,8 @@
               <th>Fund</th><th class="num">YTD</th><th class="num">1Y</th>
               <th class="num">3Y</th><th class="num">Since Inception (ann.)</th><th class="num">Since Inception (cumulative)</th>
             </tr></thead><tbody><tr><td colspan="6" class="state">Loading…</td></tr></tbody></table>
-            <table id="tbl-ret-summary" style="table-layout:fixed;margin-top:28px;">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#888;margin:22px 0 8px;">Benchmarks</div>
+            <table id="tbl-ret-idx" style="table-layout:fixed;">
               <colgroup><col style="width:24%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"><col style="width:15.2%"></colgroup>
               <tbody></tbody>
             </table>
@@ -290,6 +299,9 @@
 const PALETTE=["#1a5276","#2e86ab","#a23b72","#f18f01","#c73e1d","#3b1f2b",
   "#44bba4","#e94f37","#393e41","#6b4226","#d4e09b"];
 const POS="#1a5276", NEG="#c0392b", BENCH="#999999", GREEN="#1a7a4a";
+// Distinct dashed-line colors per benchmark (keyed by the backend's bench_key).
+// Kept muted/neutral so benchmarks stay visually subordinate to the fund lines.
+const BENCH_COLORS={pitchbook:"#999999", stepstone_pm:"#8E7CC3", sp500:"#C0884A"};
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 function fmtMonth(s){ if(s==null) return s; const p=String(s).split("-"); if(p.length>=2){ const m=parseInt(p[1],10); if(m>=1&&m<=12) return MON[m-1]+" "+p[0]; } return s; }
 Chart.defaults.color="#888";
@@ -308,6 +320,8 @@ function updateFundInfo(fund){
   fund.fund_name=fund.sec_name||fund.fund_name;
   // Show the descriptive strategy sentence for this fund.
   fund.strategy=FUND_STRATEGY[fund.fund_id]||fund.strategy;
+  // "Tender" -> "Tender Offer" in the Fund Information panel.
+  fund.fund_type=fmtFundType(fund.fund_type);
   const fields=[
     {label:"Fund Name",      key:"fund_name"},
     {label:"Strategy",       key:"strategy"},
@@ -398,6 +412,8 @@ function moneyM(x){ if(x==null) return "—"; return "$"+(x/1e6).toFixed(1)+"M";
 function cls(x){ if(x==null) return "mut"; return x>=0?"pos":"neg"; }
 function td(val,dp=1){ if(val==null) return '<td class="num mut">—</td>'; return `<td class="num ${cls(val)}">${signed(val,dp)}</td>`; }
 async function getJSON(u){ const r=await fetch(u); if(!r.ok) throw new Error(u+" "+r.status); return r.json(); }
+// Display the "Tender" fund type as its full label "Tender Offer".
+function fmtFundType(v){ if(v==null||v==="") return v; return String(v).trim().toLowerCase()==="tender"?"Tender Offer":v; }
 
 /* ---------- consistent per-fund color palette ---------- */
 // A fixed color is locked to each fund (by fund_id) and reused on every chart
@@ -502,6 +518,7 @@ function updateAsOf(page){
   if(!el) return;
   if(page==="portfolio" && store.asOf){ el.textContent="Portfolio data as of "+fmtMonthDayYear(store.asOf); el.style.display=""; }
   else if(page==="fund" && store.fundAsOf){ el.textContent="Fund data as of "+fmtMonthDayYear(store.fundAsOf); el.style.display=""; }
+  else if((page==="risk"||page==="returns") && store.rrAsOf){ el.textContent="Data as of "+fmtMonthDayYear(store.rrAsOf); el.style.display=""; }
   else { el.style.display="none"; }
 }
 
@@ -509,7 +526,7 @@ async function render(page){
   updateAsOf(page);
   if(page==="home") return renderHome();
   if(page==="portfolio") return renderPortfolio();
-  if(page==="risk"||page==="returns") return renderRisk();
+  if(page==="risk"||page==="returns") return renderRisk(page);
   if(page==="fund") return renderFund();
 }
 
@@ -524,14 +541,30 @@ async function renderHome(){
     ret.textContent=signed(lmpr);
     ret.className="value";
     ret.style.color = lmpr==null ? "#666" : (lmpr>0?GREEN : (lmpr<0?NEG : "#000"));
+    // YTD Portfolio Return — plain black percentage (no green/red coloring).
+    const ytdEl=document.getElementById("kpi-ytd");
+    if(ytdEl){ ytdEl.textContent=pct(kpi.ytd_portfolio_return); ytdEl.className="value"; ytdEl.style.color="#000"; }
+    const ytdAsof=document.getElementById("kpi-ytd-asof");
+    if(ytdAsof) ytdAsof.textContent=kpi.ytd_portfolio_return_as_of?("(AS OF "+fmtMonShortYear(kpi.ytd_portfolio_return_as_of)+")"):"";
     document.getElementById("kpi-nav").textContent=moneyM(kpi.current_total_sgg_nav);
     const navAsof=document.getElementById("kpi-nav-asof");
     if(navAsof) navAsof.textContent=kpi.current_total_sgg_nav_as_of?("(AS OF "+fmtMonShortYear(kpi.current_total_sgg_nav_as_of)+")"):"";
     const retAsof=document.getElementById("kpi-return-asof");
     if(retAsof) retAsof.textContent=kpi.last_month_portfolio_return_as_of?("(AS OF "+fmtMonShortYear(kpi.last_month_portfolio_return_as_of)+")"):"";
+    // Last Month Benchmark Return — most recent monthly Pitchbook index return,
+    // colored green/red exactly like the portfolio return card.
+    const br=document.getElementById("kpi-bench-return");
+    const lmbr=kpi.last_month_benchmark_return;
+    if(br){
+      br.textContent=signed(lmbr);
+      br.className="value";
+      br.style.color = lmbr==null ? "#666" : (lmbr>0?GREEN : (lmbr<0?NEG : "#000"));
+    }
+    const brAsof=document.getElementById("kpi-bench-asof");
+    if(brAsof) brAsof.textContent=kpi.last_month_benchmark_return_as_of?("(AS OF "+fmtMonShortYear(kpi.last_month_benchmark_return_as_of)+")"):"";
     if(!tri.benchmark_available){
       document.getElementById("bench-note").innerHTML=
-        '<div class="note">Pitchbook benchmark sheet not present in the workbook — benchmark line and downside-capture are omitted. They will populate automatically once a <code>pitchbook_tri_index</code> sheet is added.</div>';
+        '<div class="note">No benchmark sheets present in the workbook — benchmark lines and downside-capture are omitted. They will populate automatically once a <code>pitchbook_index</code> sheet is added.</div>';
     }
     // Normalized total returns — rebased to 100 at the common start of selected funds.
     // Every series defaults to SELECTED (shown); click a legend item to hide it.
@@ -541,7 +574,7 @@ async function renderHome(){
       _benchmark:!!s.benchmark,
       data:s.data.map(()=>null),
       hidden:false,
-      borderColor:s.benchmark?BENCH:fundColor(s.fund_id,i),
+      borderColor:s.benchmark?(BENCH_COLORS[s.bench_key]||BENCH):fundColor(s.fund_id,i),
       borderDash:s.benchmark?[5,4]:[],
       borderWidth:s.benchmark?1.5:1.6,
       pointRadius:0,pointHoverRadius:3,tension:0,spanGaps:true,fill:false,
@@ -572,24 +605,77 @@ async function renderHome(){
     const asOfLabel=asOf?fmtMonShortYear(asOf):null;   // e.g. "APR 2026"
     const asOfEl=document.getElementById("lastret-asof");
     if(asOfEl) asOfEl.textContent=asOfLabel?("(AS OF "+asOfLabel+")"):"";
-    // Reported funds first (sorted by return desc), then pending funds.
-    const reported=rm.metrics.filter(m=>m.common_month_return!=null)
-      .sort((a,b)=>b.common_month_return-a.common_month_return);
-    const pending=rm.metrics.filter(m=>m.common_month_return==null)
-      .sort((a,b)=>(a.fund_name||"").localeCompare(b.fund_name||""));
-    const lr=reported.concat(pending);
+    // Unified bar model: 11 fund bars (green/red, grey when pending) plus the 3
+    // benchmark index bars (in their dashed-line colors) for the SAME as-of month.
+    const fundItems=rm.metrics.map(m=>({
+      label:m.fund_name, value:m.common_month_return==null?null:m.common_month_return*100,
+      pending:m.common_month_return==null, isIndex:false,
+      color:m.common_month_return==null?GREY:(m.common_month_return>=0?GREEN:NEG)
+    }));
+    const benchOrder={pitchbook:0,stepstone_pm:1,sp500:2};
+    const idxItems=(rm.benchmark_returns||[]).map(b=>({
+      label:b.label, key:b.key, value:b.monthly_return==null?null:b.monthly_return*100,
+      pending:b.monthly_return==null, isIndex:true,
+      color:b.monthly_return==null?GREY:(BENCH_COLORS[b.key]||BENCH)
+    })).sort((a,b)=>benchOrder[a.key]-benchOrder[b.key]);
+    store.lastretHidden=store.lastretHidden||{};
+    // Visible items = funds + non-hidden indexes; ranked by return (desc), with
+    // no-data/pending bars grouped at the bottom.
+    function lastretVisible(){
+      const idx=idxItems.filter(it=>!store.lastretHidden[it.key]);
+      const all=fundItems.concat(idx);
+      const rep=all.filter(it=>it.value!=null).sort((a,b)=>b.value-a.value);
+      const pend=all.filter(it=>it.value==null).sort((a,b)=>{
+        if(a.isIndex!==b.isIndex) return a.isIndex?1:-1;
+        if(a.isIndex) return benchOrder[a.key]-benchOrder[b.key];
+        return (a.label||"").localeCompare(b.label||"");
+      });
+      return rep.concat(pend);
+    }
+    function recomputeLastret(){
+      const items=lastretVisible();
+      store.lastretItems=items;
+      const ch=charts.lastret;
+      ch.data.labels=items.map(it=>it.pending?(it.label+(it.isIndex?" — no data":" — pending")):it.label);
+      ch.data.datasets[0].data=items.map(it=>it.value);
+      ch.data.datasets[0].backgroundColor=items.map(it=>it.color);
+      ch.update();   // x-axis auto-rescales to the visible bars
+    }
     charts.lastret=new Chart(document.getElementById("chart-lastret"),{
       type:"bar",
-      data:{labels:lr.map(m=>m.common_month_return==null?(m.fund_name+" — pending"):m.fund_name),
-        datasets:[{label:"Monthly Return",
-        data:lr.map(m=>m.common_month_return==null?null:m.common_month_return*100),
-        backgroundColor:lr.map(m=>m.common_month_return==null?GREY:(m.common_month_return>=0?GREEN:NEG))}]},
+      data:{labels:[],datasets:[{label:"Monthly Return",data:[],backgroundColor:[]}]},
       options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
-        tooltip:{displayColors:false,callbacks:{label:c=>{const m=lr[c.dataIndex];
-          return m.common_month_return==null?" No "+(asOfLabel||"")+" return reported yet":" "+c.parsed.x.toFixed(2)+"%";}}}},
+        tooltip:{displayColors:false,callbacks:{label:c=>{const it=store.lastretItems[c.dataIndex];
+          return it&&it.value==null?(it.isIndex?(" No "+(asOfLabel||"")+" data"):(" No "+(asOfLabel||"")+" return reported yet")):" "+c.parsed.x.toFixed(2)+"%";}}}},
         scales:{x:{grid:{color:"#e8ecef"},ticks:{color:"#888",callback:v=>v.toFixed(1)+"%"}},
-          y:{grid:{display:false},ticks:{color:ctx=>(lr[ctx.index]&&lr[ctx.index].common_month_return==null)?GREY:"#888"}}}}
+          y:{grid:{display:false},ticks:{color:ctx=>{const it=store.lastretItems&&store.lastretItems[ctx.index];return it&&it.value==null?GREY:"#888";}}}}}
     });
+    recomputeLastret();
+    // Index legend: click to show/hide each index bar (same look as the
+    // Normalized Total Returns legend); the axis re-fits on every toggle.
+    (function(){
+      const el=document.getElementById("legend-lastret");
+      if(!el) return;
+      el.innerHTML="";
+      idxItems.forEach(it=>{
+        const sw_color=BENCH_COLORS[it.key]||BENCH;
+        const item=document.createElement("div");
+        item.className="item"+(store.lastretHidden[it.key]?"":" active");
+        const sw=document.createElement("span"); sw.className="sw";
+        sw.style.borderColor=sw_color;
+        sw.style.background=store.lastretHidden[it.key]?"transparent":sw_color;
+        const lab=document.createElement("span"); lab.textContent=it.label;
+        item.appendChild(sw); item.appendChild(lab);
+        item.addEventListener("click",()=>{
+          store.lastretHidden[it.key]=!store.lastretHidden[it.key];
+          const active=!store.lastretHidden[it.key];
+          item.classList.toggle("active",active);
+          sw.style.background=active?sw_color:"transparent";
+          recomputeLastret();
+        });
+        el.appendChild(item);
+      });
+    })();
   }catch(e){ console.error(e); }
 }
 
@@ -646,11 +732,16 @@ function recomputeNorm(ci){
 // last index where any visible series actually has a value, so unused leading/
 // trailing dates don't leave blank space.
 function trimAxis(chart){
-  const dss=chart.data.datasets.filter(d=>!d.hidden);
+  const vis=chart.data.datasets.filter(d=>!d.hidden);
+  // Bound the x-axis by the NON-benchmark (portfolio/fund) series so the chart
+  // never extends into a trailing range where only index lines have data. If
+  // every fund/portfolio series is hidden, fall back to whatever is shown.
+  let basis=vis.filter(d=>!d._benchmark);
+  if(!basis.length) basis=vis;
   const n=(chart.data.labels||[]).length;
   let lo=null, hi=null;
   for(let i=0;i<n;i++){
-    if(dss.some(d=>d.data[i]!=null)){ if(lo==null) lo=i; hi=i; }
+    if(basis.some(d=>d.data[i]!=null)){ if(lo==null) lo=i; hi=i; }
   }
   chart.options.scales.x.min = (lo==null?undefined:lo);
   chart.options.scales.x.max = (hi==null?undefined:hi);
@@ -745,69 +836,73 @@ async function renderPortfolio(){
     // Reuse the same opt-in legend helper as the Home normalized chart. Both
     // datasets start visible; clicking a label toggles it and grays it out.
     buildLegend("legend-combo", charts.combo, ()=>charts.combo.update("none"));
+
+    // Total Portfolio Return — portfolio TRI vs the 3 index TRIs, all normalized
+    // to 100 at the portfolio's first month. Same toggle/rebasing/axis-fit
+    // mechanics as the home Normalized Total Returns chart.
+    const pt=await getJSON("/api/portfolio_tri");
+    const ptDs=pt.series.map((s,i)=>({
+      label:s.fund_name,
+      _raw:s.data,
+      _benchmark:!!s.benchmark,
+      data:s.data.map(()=>null),
+      hidden:false,
+      borderColor:s.benchmark?(BENCH_COLORS[s.bench_key]||BENCH):"#1e2d3d",
+      borderDash:s.benchmark?[5,4]:[],
+      borderWidth:s.benchmark?1.5:2.2,
+      pointRadius:0,pointHoverRadius:3,tension:0,spanGaps:true,fill:false,
+    }));
+    const ptOpts=lineOpts({legend:false});
+    ptOpts.animations={x:{duration:500,easing:"easeOutCubic"},y:{duration:0}};
+    ptOpts.plugins.tooltip.usePointStyle=true;
+    ptOpts.plugins.tooltip.callbacks.labelPointStyle=()=>({pointStyle:"line",rotation:0});
+    ptOpts.plugins.tooltip.itemSort=(a,b)=>b.parsed.y-a.parsed.y;
+    charts.portTri=new Chart(document.getElementById("chart-port-tri"),{
+      type:"line",data:{labels:pt.dates,datasets:ptDs},options:ptOpts});
+    buildLegend("legend-port-tri", charts.portTri, ()=>recomputeNorm(charts.portTri));
+    recomputeNorm(charts.portTri);
   }catch(e){ console.error(e); charts._port=false; }
 }
 
 /* ---------- RISK & RETURN ---------- */
-// Column summary statistic over the numeric values (ignores null / "n/a").
-function aggStat(vals, kind){
-  const a=vals.filter(v=>typeof v==="number" && isFinite(v));
-  if(!a.length) return null;
-  if(kind==="mean")   return a.reduce((s,x)=>s+x,0)/a.length;
-  if(kind==="max")    return Math.max(...a);
-  if(kind==="min")    return Math.min(...a);
-  if(kind==="median"){ const s=[...a].sort((x,y)=>x-y), n=s.length;
-    return n%2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2; }
-  return null;
-}
-// Build Mean / Median / Maximum / Minimum rows (black label) for a table.
-// cols: [{get:(m)=>value, fmt:(v)=>string}]
-function summaryRows(metrics, cols){
-  const stats=[["Mean","mean"],["Median","median"],["Maximum","max"],["Minimum","min"]];
-  return stats.map(([label,kind])=>{
-    const cells=cols.map(c=>{
-      const s=aggStat(metrics.map(c.get), kind);
-      return `<td class="num">${s==null?"—":c.fmt(s)}</td>`;
-    }).join("");
-    return `<tr><td><strong>${label}</strong></td>${cells}</tr>`;
-  }).join("");
-}
-const fmtMonthsStat=v=> Number.isInteger(v) ? String(v) : v.toFixed(1);
-
-async function renderRisk(){
-  if(store._riskDone) return;
+async function renderRisk(page){
+  if(store._riskDone){ updateAsOf(page); return; }
   store._riskDone=true;
   try{
-    const [risk,ret]=await Promise.all([getJSON("/api/risk_metrics"),getJSON("/api/return_metrics")]);
+    // common=1 -> every fund's metrics measured to the single all-funds as-of month.
+    const [risk,ret]=await Promise.all([getJSON("/api/risk_metrics?common=1"),getJSON("/api/return_metrics?common=1")]);
+    // One shared as-of for both tables, shown in the top-right corner.
+    store.rrAsOf = ret.as_of || risk.as_of || null;
+    updateAsOf(page);
     const rb=document.querySelector("#tbl-risk tbody");
-    rb.innerHTML=risk.metrics.map((m,i)=>{const ao=asOfTitle(m.as_of);return `<tr>
+    rb.innerHTML=risk.metrics.map((m,i)=>`<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      <td class="num tip" data-tip="${ao}">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
-      <td class="num tip" data-tip="${ao}">${m.time_to_trough??"—"}</td>
-      <td class="num tip" data-tip="${ao}">${m.recovery_time??"—"}</td>
-      <td class="num tip" data-tip="${ao}">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
-      <td class="num tip" data-tip="${ao}">${typeof m.downside_capture_ratio==="number"?m.downside_capture_ratio.toFixed(1)+"%":"—"}</td>
-    </tr>`;}).join("");
-    document.querySelector("#tbl-risk-summary tbody").innerHTML=summaryRows(risk.metrics, [
-        {get:m=>m.max_drawdown,            fmt:v=>pct(v)},
-        {get:m=>m.time_to_trough,          fmt:fmtMonthsStat},
-        {get:m=>m.recovery_time,           fmt:fmtMonthsStat},
-        {get:m=>m.annualized_std_dev,      fmt:v=>pct(v)},
-        {get:m=>m.downside_capture_ratio,  fmt:v=>v.toFixed(1)+"%"},
-      ]);
+      <td class="num">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
+      <td class="num">${m.time_to_trough??"—"}</td>
+      <td class="num">${m.recovery_time??"—"}</td>
+      <td class="num">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
+      <td class="num">${typeof m.downside_capture_ratio==="number"?m.downside_capture_ratio.toFixed(1)+"%":"—"}</td>
+    </tr>`).join("");
     const tb=document.querySelector("#tbl-ret tbody");
-    tb.innerHTML=ret.metrics.map((m,i)=>{const ao=asOfTitle(m.as_of);return `<tr>
+    tb.innerHTML=ret.metrics.map((m,i)=>`<tr>
       <td><strong>${m.fund_name??"—"}</strong></td>
-      <td class="num tip" data-tip="${ao}">${pct(m.ytd_return)}</td><td class="num tip" data-tip="${ao}">${pct(m.trailing_1y)}</td><td class="num tip" data-tip="${ao}">${pct(m.trailing_3y)}</td>
-      <td class="num tip" data-tip="${ao}">${pct(m.annualized_since_inception)}</td><td class="num tip" data-tip="${ao}">${pct(m.total_return_since_inception)}</td>
-    </tr>`;}).join("");
-    document.querySelector("#tbl-ret-summary tbody").innerHTML=summaryRows(ret.metrics, [
-        {get:m=>m.ytd_return,                  fmt:v=>pct(v)},
-        {get:m=>m.trailing_1y,                 fmt:v=>pct(v)},
-        {get:m=>m.trailing_3y,                 fmt:v=>pct(v)},
-        {get:m=>m.annualized_since_inception,  fmt:v=>pct(v)},
-        {get:m=>m.total_return_since_inception,fmt:v=>pct(v)},
-      ]);
+      <td class="num">${pct(m.ytd_return)}</td><td class="num">${pct(m.trailing_1y)}</td><td class="num">${pct(m.trailing_3y)}</td>
+      <td class="num">${pct(m.annualized_since_inception)}</td><td class="num">${pct(m.total_return_since_inception)}</td>
+    </tr>`).join("");
+    // Benchmark index rows (same as-of cutoff; "—" where an index has no data).
+    document.querySelector("#tbl-risk-idx tbody").innerHTML=(risk.index_metrics||[]).map(m=>`<tr>
+      <td><strong>${m.fund_name??"—"}</strong></td>
+      <td class="num">${m.max_drawdown!=null?pct(m.max_drawdown):"—"}</td>
+      <td class="num">${m.time_to_trough??"—"}</td>
+      <td class="num">${m.recovery_time??"—"}</td>
+      <td class="num">${m.annualized_std_dev!=null?pct(m.annualized_std_dev):"—"}</td>
+      <td class="num">${typeof m.downside_capture_ratio==="number"?m.downside_capture_ratio.toFixed(1)+"%":"—"}</td>
+    </tr>`).join("");
+    document.querySelector("#tbl-ret-idx tbody").innerHTML=(ret.index_metrics||[]).map(m=>`<tr>
+      <td><strong>${m.fund_name??"—"}</strong></td>
+      <td class="num">${pct(m.ytd_return)}</td><td class="num">${pct(m.trailing_1y)}</td><td class="num">${pct(m.trailing_3y)}</td>
+      <td class="num">${pct(m.annualized_since_inception)}</td><td class="num">${pct(m.total_return_since_inception)}</td>
+    </tr>`).join("");
   }catch(e){
     document.querySelector("#tbl-risk tbody").innerHTML='<tr><td colspan="6" class="state err">Error loading.</td></tr>';
   }
@@ -844,43 +939,37 @@ async function loadFund(fid){
   if(fkNavAsof) fkNavAsof.textContent=(n.nav_per_share!=null && n.month_end && n.month_end!==store.fundAsOf)?("(AS OF "+fmtMonShortYear(n.month_end)+")"):"";
   const cg=document.getElementById("fk-cagr");
   cg.textContent=pct(r.annualized_since_inception); cg.className="value sm";
-  document.getElementById("fk-strat").textContent=f.fund_type||"—";
+  document.getElementById("fk-strat").textContent=fmtFundType(f.fund_type)||"—";
   const lmr=document.getElementById("fk-lmr");
   lmr.textContent=signed(r.last_monthly_return); lmr.className="value sm";
   lmr.style.color = r.last_monthly_return==null ? "#666" : (r.last_monthly_return>=0?GREEN:NEG);
   document.getElementById("fk-title").textContent=`Total Returns — ${f.fund_name??""}`;
 
   const t=await getJSON("/api/tri/"+fid);
-  // Normalize: rebase the fund (and benchmark) to 100 at their common start —
-  // the first date where every shown series has data — so both lines begin at
-  // the same point and are directly comparable. trimAxis then fits the x-axis.
-  const fundRaw=t.fund?t.fund.data:null;
-  const benchRaw=t.benchmark?t.benchmark.data:null;
-  const N=t.dates.length;
-  let start=-1;
-  for(let i=0;i<N;i++){
-    if(fundRaw && fundRaw[i]!=null && (!benchRaw || benchRaw[i]!=null)){ start=i; break; }
-  }
-  const rebase=raw=>{
-    if(!raw) return raw;
-    if(start<0) return raw.map(()=>null);
-    const base=raw[start];
-    if(base==null) return raw.map(()=>null);
-    return raw.map((v,i)=> (i>=start && v!=null)? v/base*100 : null);
-  };
-  const fundData=rebase(fundRaw), benchData=benchRaw?rebase(benchRaw):null;
-  // Same legend mechanics as Home: every series defaults to SELECTED (shown);
-  // click a legend item to hide it, and the x-axis re-fits to what's visible.
-  const ds=[{label:t.fund.fund_name,data:fundData,borderColor:fundColor(Number(fid),0),
-    hidden:false,borderWidth:2,fill:false,tension:0,pointRadius:0,spanGaps:true}];
-  if(benchData){ds.push({label:"Pitchbook Index",data:benchData,borderColor:BENCH,
-    hidden:false,borderDash:[5,4],borderWidth:1.5,fill:false,tension:0,pointRadius:0,spanGaps:true});}
+  // Normalize: rebase the fund AND all 3 benchmarks to 100 at the fund's
+  // inception (recomputeNorm handles the single-fund case), with the same
+  // click-to-toggle legend and auto-fitting x-axis as the home chart.
+  const fds=(t.series||[]).map((s,i)=>({
+    label:s.fund_name,
+    _raw:s.data,
+    _benchmark:!!s.benchmark,
+    data:s.data.map(()=>null),
+    hidden:false,
+    borderColor:s.benchmark?(BENCH_COLORS[s.bench_key]||BENCH):fundColor(Number(fid),0),
+    borderDash:s.benchmark?[5,4]:[],
+    borderWidth:s.benchmark?1.5:2,
+    pointRadius:0,pointHoverRadius:3,tension:0,spanGaps:true,fill:false,
+  }));
+  const fOpts=lineOpts({legend:false});
+  fOpts.animations={x:{duration:500,easing:"easeOutCubic"},y:{duration:0}};
+  fOpts.plugins.tooltip.usePointStyle=true;
+  fOpts.plugins.tooltip.callbacks.labelPointStyle=()=>({pointStyle:"line",rotation:0});
+  fOpts.plugins.tooltip.itemSort=(a,b)=>b.parsed.y-a.parsed.y;
   if(charts.fund) charts.fund.destroy();
   charts.fund=new Chart(document.getElementById("chart-fund"),{
-    type:"line",data:{labels:t.dates,datasets:ds},options:lineOpts({legend:false})});
-  buildLegend("legend-fund", charts.fund, ()=>{ trimAxis(charts.fund); charts.fund.update(); });
-  trimAxis(charts.fund);
-  charts.fund.update();
+    type:"line",data:{labels:t.dates,datasets:fds},options:fOpts});
+  buildLegend("legend-fund", charts.fund, ()=>recomputeNorm(charts.fund));
+  recomputeNorm(charts.fund);
 }
 
 /* ---------- Normalized Total Returns fullscreen modal ---------- */
